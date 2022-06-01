@@ -51,8 +51,8 @@
             ++ [
               # { package = common.pkgs.git; }
               # { name = "helloworld"; command = "echo 'Hello world'"; }
-                common.pkgs.rust-analyzer
-                common.pkgs.cargo-watch
+              common.pkgs.rust-analyzer
+              common.pkgs.cargo-watch
             ];
           # Environment variables to be exported.
           env =
