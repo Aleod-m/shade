@@ -1,6 +1,6 @@
 [package]
 license = "mit"
-name = "rust-nix-template"
+name = "shade"
 version = "0.1.0"
 edition = "2021"
 

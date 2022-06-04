@@ -43,7 +43,10 @@
         # Development shell overrides.
         shell = common: prev: {
           # Packages to be put in $PATH.
-          packages = prev.packages ++ [];
+          packages = prev.packages ++ [
+              common.pkgs.rust-analyzer
+              common.pkgs.cargo-watch
+          ];
           # Commands that will be shown in the `menu`. These also get added
           # to packages.
           commands =
@@ -51,8 +54,6 @@
             ++ [
               # { package = common.pkgs.git; }
               # { name = "helloworld"; command = "echo 'Hello world'"; }
-              common.pkgs.rust-analyzer
-              common.pkgs.cargo-watch
             ];
           # Environment variables to be exported.
           env =
