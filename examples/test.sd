@@ -1,0 +1,32 @@
+: {
+
+    vec2f = x: y: {
+        x: float,
+        y: float,
+    }, 
+
+    vec2f = x: y: {
+        x: float,
+        y: float,
+    },
+
+    vec2f = val: {
+        x: float = val,
+        y: float = val,
+    },
+
+
+    circle = c: r: {
+        c: vec2,
+        r: float,
+        sdf = point:
+            (length point - c) - r
+    },
+
+
+    frag: vec4 = (uv: vec2f) (res: vec2i) :
+        uv
+            |> + .5  
+            |> (circle (vec2 0) 10.).sdf
+}
+

@@ -1,6 +1,14 @@
 use std::fmt;
 use std::iter::Peekable;
 
+use err_derive::Error;
+
+#[derive(Debug, Error)]
+enum LexError {
+    #[error(display = "Unrecognized token at {}: {}", _0, _1)]
+    UnrecognizedToken(String, Loc),
+}
+
 #[derive(Default, Debug, Clone, PartialEq)]
 pub struct Loc {
     pub file_path: Option<String>,
@@ -33,7 +41,7 @@ pub enum TokenKind {
 
     Unrecognized,
     EOI,
-    SOI,
+
 }
 
 impl TokenKind {
@@ -62,7 +70,6 @@ impl fmt::Display for TokenKind {
             Colon => write!(f, "colon"),
             Unrecognized => write!(f, "unrecognized"),
             EOI => write!(f, "end of input"),
-            SOI => write!(f, "start of input"),
             Int => write!(f, "integer"),
             Float => write!(f, "float"),
             Plus => write!(f, "plus"),
@@ -91,73 +98,68 @@ impl fmt::Display for Token {
     }
 }
 
-pub struct Lexer<C: Iterator<Item = char>> {
-    chars: Peekable<C>,
-    peeked: Option<Token>,
-    exhausted: bool,
+pub struct Lexer {
     file_path: Option<String>,
-    lnum: usize,
-    cnum: usize,
+    peeked: Option<Token>,
+    input: Vec<char>,
+    idx: usize,
+    row: usize,
+    col: usize,
 }
 
-impl<C: Iterator<Item = char>> Lexer<C> {
-    pub fn new(chars: C, file_path: Option<String>) -> Self {
-        let soitok = Token {
-            kind: TokenKind::SOI,
-            loc: Loc::default(),
-            text: String::default(),
-        };
+impl Lexer {
+    pub fn new(chars: impl Iterator<Item = char>, file_path: Option<String>) -> Self {
         Self {
-            chars: chars.peekable(),
-            peeked: Some(soitok),
-            exhausted: false,
+            input: chars.collect(),
+            peeked: None,
+            idx: 0usize,
             file_path,
-            lnum: 0usize,
-            cnum: 0usize,
+            row: 0usize,
+            col: 0usize,
         }
     }
 
     pub fn loc(&self) -> Loc {
         Loc {
             file_path: self.file_path.clone(),
-            row: self.lnum,
-            col: self.cnum,
+            row: self.row,
+            col: self.col,
         }
+    }
+
+    pub fn expect_tok(&mut self, kind: TokenKind) -> bool {
+        self.lex().kind == kind
     }
 
     pub fn next_tok(&mut self) -> Token {
-        self.peeked.take().unwrap_or_else(|| self.lex())
+        self.lex()
     }
 
     pub fn peek_tok(&mut self) -> &Token {
-        let token = self.next_tok();
-        self.peeked.insert(token)
-    }
-
-    pub fn expect_tok(&mut self, kind: TokenKind) -> Result<Token, Token> {
-        let token = self.next_tok();
-        if kind == token.kind {
-            Ok(token)
-        } else {
-            Err(token)
-        }
+        let tok = self.lex();
+        self.peeked = Some(tok);
+        &tok
     }
 
     fn trim_whitespaces(&mut self) {
-        while self
-            .chars
-            .next_if(|c| c.is_whitespace() && *c != '\n')
-            .is_some()
+        let stop = false;
+        while !stop
         {
-            self.cnum += 1;
+            let c = self.input[self.idx];
+            match c {
+                _ if c.is_whitespace() && c != '\n' => self.col += 1,
+                '\n' => stop = true,
+            }
+            self.idx += 1;
+            stop |= self.idx == self.input.len();
         }
     }
 
     fn lex(&mut self) -> Token {
         self.trim_whitespaces();
         let loc = self.loc();
-        if let Some(x) = self.chars.next() {
-            self.cnum += 1;
+        if let Some(x) = self.input[self.idx] {
+            self.col += 1;
             let mut text = x.to_string();
             match x {
                 ':' => Token {
@@ -191,8 +193,8 @@ impl<C: Iterator<Item = char>> Lexer<C> {
                     kind: TokenKind::Percent,
                 },
                 _ if x.is_alphabetic() || x == '_' => {
-                    while let Some(x) = self.chars.next_if(is_ident_char) {
-                        self.cnum += 1;
+                    while let Some(x) = self.input.next_if(is_ident_char) {
+                        self.col += 1;
                         text.push(x);
                     }
                     Token {
@@ -203,8 +205,8 @@ impl<C: Iterator<Item = char>> Lexer<C> {
                 }
                 _ if x.is_numeric() => {
                     let mut kind = TokenKind::Int;
-                    while let Some(x) = self.chars.next_if(is_number_char) {
-                        self.cnum += 1;
+                    while let Some(x) = self.input.next_if(is_number_char) {
+                        self.col += 1;
                         text.push(x);
                         if "eE.".contains(x) {
                             kind = TokenKind::Float;
@@ -219,27 +221,27 @@ impl<C: Iterator<Item = char>> Lexer<C> {
                 },
             }
         } else {
-            self.cnum += 1;
+            self.col += 1;
             let eoitok = Token {
                 kind: TokenKind::EOI,
                 loc: Loc::default(),
                 text: String::default(),
             };
-            self.exhausted = true;
             eoitok
         }
     }
-}
 
-impl<C: Iterator<Item = char>> Iterator for Lexer<C> {
-    type Item = Token;
+    pub fn pos(&self) -> (usize, usize, usize) {
+        (self.row, self.col, self.idx)
+    }
 
-    fn next(&mut self) -> Option<Self::Item> {
-        if self.exhausted {
-            None
-        } else {
-            Some(self.next_tok())
-        }
+    pub fn reset_pos(&mut self, mark: (usize, usize, usize)) {
+        self.peeked = None;
+        (self.row, self.col, self.idx) = mark;
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.idx == self.input.len()
     }
 }
 
