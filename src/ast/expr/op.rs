@@ -1,10 +1,7 @@
 use core::fmt;
-use std::fmt::format;
 
-use err_derive::Error;
 
-use crate::{lexer::{TokenKind, Token, Lexer}};
-
+use crate::lexer::{Lexer, TokenKind};
 
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub enum Op {
@@ -16,6 +13,23 @@ pub enum Op {
 }
 
 impl Op {
+    pub fn is_bin_op(&self) -> bool {
+        use Op::*;
+        match self {
+            Add | Sub | Mul | Div | Mod => true,
+            _ => false,
+        }
+    }
+
+    pub fn is_unary_op(&self) -> bool {
+        use Op::*;
+        match self {
+            Add | Sub => true,
+            _ => false,
+        }
+    }
+
+
     fn from_token_kind(kind: TokenKind) -> Option<Self> {
         use TokenKind::*;
         match kind {
@@ -32,7 +46,7 @@ impl Op {
         use Op::*;
         match self {
             Add | Sub => 1,
-            Mul | Div | Mod=> 2,
+            Mul | Div | Mod => 2,
         }
     }
 }
@@ -49,7 +63,8 @@ impl fmt::Display for Op {
         }
     }
 }
-pub fn parse_op(lexer: Lexer) -> Option<Op> {
+
+pub fn parse_op(mut lexer: Lexer) -> Option<Op> {
     let pos = lexer.pos();
     let tok = Op::from_token_kind(lexer.peek_tok().kind);
     if tok.is_none() {
