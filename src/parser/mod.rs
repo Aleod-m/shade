@@ -8,7 +8,7 @@ impl Parser {
         todo!();
     }
     
-    pub fn parse_value(lexer: Lexer) -> Option<ast::Value> {
+    pub fn parse_value(mut lexer: Lexer) -> Option<ast::Value> {
         let pos = lexer.pos();
         let tok = lexer.next_tok();
         use TokenKind::*;
@@ -22,7 +22,5 @@ impl Parser {
         }
     }
     
-    pub fn parse_unary_expr(lexer: Lexer) -> Option<ast::UnaryExpr> {
-    }
 }
 

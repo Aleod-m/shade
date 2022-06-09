@@ -1,5 +1,4 @@
 use std::fmt;
-use std::iter::Peekable;
 
 use err_derive::Error;
 
@@ -81,7 +80,7 @@ impl fmt::Display for TokenKind {
     }
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub struct Token {
     pub kind: TokenKind,
     pub text: String,
@@ -135,20 +134,21 @@ impl Lexer {
         self.lex()
     }
 
-    pub fn peek_tok(&mut self) -> &Token {
+    pub fn peek_tok(&mut self) -> Token {
         let tok = self.lex();
-        self.peeked = Some(tok);
-        &tok
+        self.peeked = Some(tok.clone());
+        tok
     }
 
     fn trim_whitespaces(&mut self) {
-        let stop = false;
+        let mut stop = false;
         while !stop
         {
             let c = self.input[self.idx];
             match c {
                 _ if c.is_whitespace() && c != '\n' => self.col += 1,
                 '\n' => stop = true,
+                _ => continue,
             }
             self.idx += 1;
             stop |= self.idx == self.input.len();
@@ -157,9 +157,12 @@ impl Lexer {
 
     fn lex(&mut self) -> Token {
         self.trim_whitespaces();
+
         let loc = self.loc();
-        if let Some(x) = self.input[self.idx] {
+        if self.idx < self.input.len() {
+            let x = self.input[self.idx]; 
             self.col += 1;
+            self.idx += 1;
             let mut text = x.to_string();
             match x {
                 ':' => Token {
@@ -193,9 +196,10 @@ impl Lexer {
                     kind: TokenKind::Percent,
                 },
                 _ if x.is_alphabetic() || x == '_' => {
-                    while let Some(x) = self.input.next_if(is_ident_char) {
+                    while is_ident_char(&self.input[self.idx]) && self.idx < self.input.len() {
                         self.col += 1;
-                        text.push(x);
+                        self.idx += 1;
+                        text.push(self.input[self.idx]);
                     }
                     Token {
                         text,
@@ -205,10 +209,11 @@ impl Lexer {
                 }
                 _ if x.is_numeric() => {
                     let mut kind = TokenKind::Int;
-                    while let Some(x) = self.input.next_if(is_number_char) {
+                    while is_number_char(&self.input[self.idx]) && self.idx < self.input.len() {
                         self.col += 1;
-                        text.push(x);
-                        if "eE.".contains(x) {
+                        self.idx+= 1;
+                        text.push(self.input[self.idx]);
+                        if "eE.".contains(self.input[self.idx]) {
                             kind = TokenKind::Float;
                         };
                     }
@@ -244,7 +249,6 @@ impl Lexer {
         self.idx == self.input.len()
     }
 }
-
 fn is_ident_char(x: &char) -> bool {
     x.is_alphanumeric() || *x == '_'
 }
