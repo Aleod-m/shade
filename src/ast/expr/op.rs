@@ -2,8 +2,8 @@ use core::fmt;
 
 
 use crate::lexer::{Lexer, TokenKind};
-
 #[derive(Debug, Clone, Copy, PartialEq)]
+#[non_exhaustive]
 pub enum Op {
     Add,
     Sub,
@@ -29,7 +29,6 @@ impl Op {
         }
     }
 
-
     fn from_token_kind(kind: TokenKind) -> Option<Self> {
         use TokenKind::*;
         match kind {
@@ -47,6 +46,7 @@ impl Op {
         match self {
             Add | Sub => 1,
             Mul | Div | Mod => 2,
+            _ => 0,
         }
     }
 }

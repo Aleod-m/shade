@@ -1,40 +1,72 @@
-mod bin_expr;
-mod unary_expr;
 use std::collections::HashMap;
 
-pub use unary_expr::*;
 mod op;
 pub use op::*;
+mod unary_expr;
+pub use unary_expr::*;
+mod bin_expr;
+pub use bin_expr::*;
 mod value;
 pub use value::*;
 
-use super::EvaluationError;
+use crate::types::{TypeCheckVisitor, TypeError, Type};
 
+#[derive(Debug)]
 pub enum Expr {
     Unary(UnaryExpr),
+    Binary(BinaryExpr),
     Value(Value),
     Ident(String),
 }
-
 
 impl Expr {
     pub fn unary(op: Op, expr: Expr) -> Self {
         if !op.is_unary_op() {
             panic!("Op is not unary!");
         }
-       Expr::Unary(UnaryExpr{ op, expr: Box::new(expr)})
+        Expr::Unary(UnaryExpr {
+            op,
+            expr: Box::new(expr),
+        })
     }
 
+    pub fn binary(op: Op, lhs: Expr, rhs: Expr) -> Self {
+        if !op.is_bin_op() {
+            panic!("Op is not unary!");
+        }
+        Expr::Binary(BinaryExpr {
+            op,
+            lhs: Box::new(lhs),
+            rhs: Box::new(rhs),
+        })
+    }
 
-    pub fn eval(&self, context: &mut HashMap<String, Value>) -> Result<Value, EvaluationError> {
+    pub fn value(val: impl Into<Value>) -> Self {
+        Self::Value(val.into())
+    }
+
+    pub fn eval(&self, context: &mut HashMap<String, Value>) -> Value {
         use Expr::*;
         match self {
             Unary(uexpr) => uexpr.eval(context),
-            Value(val) => Ok(*val),
+            Binary(bexpr) => bexpr.eval(context),
+            Value(val) => *val,
             Ident(name) => context
                 .get(name)
                 .map(|val| *val)
-                .ok_or(EvaluationError::ValueNotPresentInContext(name.to_string())),
+                .unwrap()
+        }
+    }
+}
+
+impl TypeCheckVisitor for Expr {
+    fn ty_check(&self, context: &mut HashMap<String, Type>) -> Result<Type, TypeError> {
+        use Expr::*;
+        match self {
+            Unary(uexpr) => uexpr.ty_check(context),
+            Binary(bexpr) => bexpr.ty_check(context),
+            Value(val) => val.ty_check(context),
+            Ident(name) => context.get(name).map(|ty| *ty).ok_or(TypeError::TypedValueNotPresentInContext),
         }
     }
 }

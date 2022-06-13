@@ -1,52 +1,43 @@
-use std::fmt;
+use std::collections::HashMap;
 
-use crate::lexer::TokenKind;
+use crate::types::{Type, TypeCheckVisitor, TypeError};
 
+use super::{Expr, Op, Value};
 
-#[derive(Debug, Clone)]
-pub enum Expr {
-    Binary(ExprBinary),
+#[derive(Debug)]
+pub struct BinaryExpr {
+    pub lhs: Box<Expr>,
+    pub op: Op,
+    pub rhs: Box<Expr>,
 }
 
-#[derive(Debug, Clone)]
-pub struct ExprBinary {
-    pub left: Box<Expr>,
-    pub op: BinOp,
-    pub right: Box<Expr>,
-}
-
-#[derive(Debug, Clone, Copy, PartialEq)]
-pub enum BinOp {
-    Add,
-    Sub,
-    Mul,
-    Div,
-    Mod,
-}
-
-impl BinOp {
-    fn from_token_kind(kind: TokenKind) -> Option<Self> {
-        use TokenKind::*;
-        match kind {
-            Plus => Some(BinOp::Add),
-            Dash => Some(BinOp::Sub),
-            Star => Some(BinOp::Mul),
-            Slash => Some(BinOp::Div),
-            Percent => Some(BinOp::Mod),
-            _ => None,
+impl BinaryExpr {
+    pub fn eval(&self, context: &mut HashMap<String, Value>) -> Value  {
+        let lhs = self.lhs.eval(context);
+        let rhs = self.rhs.eval(context);
+        match self.op {
+            Op::Add => lhs.add(rhs),
+            Op::Sub => lhs.sub(rhs),
+            Op::Mod => lhs.modulo(rhs),
+            Op::Mul => lhs.mul(rhs),
+            Op::Div => lhs.div(rhs),
+            _ => unreachable!(),
         }
     }
 }
 
-impl fmt::Display for BinOp {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        use BinOp::*;
-        match self {
-            Add => write!(f, "+"),
-            Sub => write!(f, "-"),
-            Mul => write!(f, "*"),
-            Div => write!(f, "/"),
-            Mod => write!(f, "%"),
+impl TypeCheckVisitor for BinaryExpr {
+    fn ty_check(&self, context: &mut HashMap<String, Type>) -> Result<Type, TypeError> {
+        let lty = self.lhs.ty_check(context)?;
+        use Op::*;
+        match self.op {
+            Add | Sub | Mul | Div | Mod => {
+                if lty == self.rhs.ty_check(context)? {
+                    Ok(lty)
+                } else {
+                    Err(TypeError::OperatorError)
+                }
+            }
         }
     }
 }

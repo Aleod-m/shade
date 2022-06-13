@@ -249,6 +249,7 @@ impl Lexer {
         self.idx == self.input.len()
     }
 }
+
 fn is_ident_char(x: &char) -> bool {
     x.is_alphanumeric() || *x == '_'
 }

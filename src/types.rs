@@ -1,13 +1,11 @@
-use std::fmt::Display;
+use std::{collections::HashMap, fmt::Display};
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, Copy, PartialEq)]
 pub enum Type {
     Unit,
     Bool,
     Int,
     Float,
-    Vec{ty:Box<Type>, dimension: usize},
-    List{ty:Box<Type>},
 }
 
 impl Display for Type {
@@ -18,8 +16,15 @@ impl Display for Type {
             Bool => write!(f, "bool"),
             Int => write!(f, "int"),
             Float => write!(f, "float"),
-            Vec { dimension, .. } => write!(f, "vec{}", dimension),
-            List { ty } => write!(f, "[{}]", ty),
         }
     }
+}
+
+pub enum TypeError {
+    OperatorError,
+    TypedValueNotPresentInContext,
+}
+
+pub trait TypeCheckVisitor {
+    fn ty_check(&self, context: &mut HashMap<String, Type>) -> Result<Type, TypeError>;
 }

@@ -15,8 +15,13 @@ As i wanted to use shade for creating games i wanted it to not only be used as a
 
 ## Road Map
 
-- [ ] basic syntax parser.
+- [x] Lexer
+- [_] basic syntax parser.
+    - [ ] Parse Simple unary exprs.
+    - [ ] Parse Simple statements.
 - [ ] interpreter.
+    - [x] Unary expr int + float.
+    - [x] Assignement expr to identifier.
 - [ ] compile to naga intermediate repr.
 - [ ] standard library.
 - [ ] Image generator.
