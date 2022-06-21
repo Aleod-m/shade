@@ -1,9 +1,9 @@
 use std::io::Write;
 
-mod lexer;
-mod parser;
 mod ast;
+mod lexer;
 mod types;
+//mod parser;
 
 #[derive(clap::Parser, Debug)]
 #[clap(author, version, about, long_about = None)]
@@ -15,9 +15,8 @@ struct Args {
 #[derive(clap::Subcommand, Debug)]
 enum Commands {
     #[clap()]
-    Interpret,
+    I,
 }
-
 
 fn main() -> std::io::Result<()> {
     let args = {
@@ -26,27 +25,38 @@ fn main() -> std::io::Result<()> {
     };
 
     match args.command {
-        Commands::Interpret => interpret(),
+        Commands::I => interpret(),
     }
 }
 
 fn interpret() -> std::io::Result<()> {
     println!("interpret");
-    let mut line = String::new(); 
+    let mut line = String::new();
     print!("> ");
-    while line != "exit" {
+    loop {
         std::io::stdout().flush()?;
         line.clear();
         std::io::stdin().read_line(&mut line)?;
+        if line.eq("exit\n") {
+            break;
+        }
         let mut input = lexer::Lexer::new(line.chars(), None);
         print!("Lexer Input: \n\t {line}\n");
         print!("Lexer output: \n\t");
-        while !input.is_empty() {
-            print!("{}\n\t", input.lex());
+        while let Ok(tok) = input.lex() {
+            print!("{}\n\t", tok);
         }
         print!("\n> ");
     }
     //let lexer = lexer::Lexer::new(line.chars(), None);
     //let stmt  = parser::ValueParser::parse(lexer);
     Ok(())
+}
+
+fn check() -> std::io::Result<()> {
+    unimplemented!()
+}
+
+fn compile() -> std::io::Result<()> {
+    unimplemented!()
 }

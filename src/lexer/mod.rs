@@ -1,31 +1,35 @@
+use std::{iter::Peekable, str::Chars};
+
 use err_derive::Error;
 
 mod token;
 pub use token::*;
 
 #[derive(Debug, Error)]
-enum LexError {
+pub enum LexError {
     #[error(display = "Unrecognized token at {}: {}", _0, _1)]
-    UnrecognizedToken(String, Loc),
+    UnrecognizedToken(Loc, Token),
+    #[error(display = "End of input reached.")]
+    EOIReached,
 }
 
 #[derive(Debug)]
-pub struct Lexer {
+pub struct Lexer<'a> {
     file_path: Option<String>,
-    input: Vec<char>,
-    idx: usize,
+    input: Peekable<Chars<'a>>,
     row: usize,
     col: usize,
+    ended: bool,
 }
 
-impl Lexer {
-    pub fn new(chars: impl Iterator<Item = char>, file_path: Option<String>) -> Self {
+impl<'a> Lexer<'a> {
+    pub fn new(chars: Chars<'a>, file_path: Option<String>) -> Self {
         Self {
-            input: chars.collect(),
-            idx: 0usize,
+            input: chars.peekable(),
             file_path,
             row: 0usize,
             col: 0usize,
+            ended: false,
         }
     }
 
@@ -38,132 +42,129 @@ impl Lexer {
     }
 
     fn trim_whitespaces(&mut self) {
-        while !self.is_empty() {
-            let c = self.get_char();
+        while let Some(_) = self.input.next_if(|c| {
             match c {
-                _ if c.is_whitespace() && c != '\n' => self.col += 1,
+                _ if c.is_whitespace() && *c != '\n' => {self.col += 1; true},
                 '\n' => {
                     self.col = 0;
                     self.row += 1;
+                    true
                 }
-                _ => break,
+                _ => false,
             }
-            self.idx += 1;
+        }) {}
+    }
+
+    fn advance(&mut self) -> Option<char> {
+        self.col += 1;
+        self.input.next()
+    }
+
+    fn advance_if(&mut self,f: impl FnOnce(&char)->bool ) -> Option<char> {
+        let output = self.input.next_if(f);
+        if output.is_some() {
+            self.col+=1;
         }
+        output
     }
 
-    fn advance(&mut self) -> char {
-        let c = self.get_char();
-        self.idx += 1;
-        return c;
-    }
-
-    fn get_char(&self) -> char {
-        self.input[self.idx]
-    }
-
-    pub fn lex(&mut self) -> Token {
+    pub fn lex(&mut self) -> Result<Token, LexError> {
+        if self.ended {
+            return Err(LexError::EOIReached);
+        }
         self.trim_whitespaces();
         let loc = self.loc();
-        if !self.is_empty() {
-            let mut c = self.advance();
+        if let Some(c) = self.advance() {
             let mut text = c.to_string();
             match c {
-                ':' => Token {
+                ':' => Ok(Token {
                     text,
                     kind: TokenKind::Colon,
                     loc,
-                },
-                '+' => Token {
+                }),
+                '+' => Ok(Token {
                     text,
                     loc,
                     kind: TokenKind::Plus,
-                },
-                '-' => Token {
+                }),
+                '-' => Ok(Token {
                     text,
                     loc,
                     kind: TokenKind::Dash,
-                },
-                '*' => Token {
+                }),
+                '*' => Ok(Token {
                     text,
                     loc,
                     kind: TokenKind::Star,
-                },
-                '/' => Token {
+                }),
+                '/' => Ok(Token {
                     text,
                     loc,
                     kind: TokenKind::Slash,
-                },
-                '%' => Token {
+                }),
+                '%' => Ok(Token {
                     text,
                     loc,
                     kind: TokenKind::Percent,
-                },
-                '(' => Token {
+                }),
+                '(' => Ok(Token {
                     text,
                     loc,
                     kind: TokenKind::Lpar,
-                },
-                ')' => Token {
+                }),
+                ')' => Ok(Token {
                     text,
                     loc,
                     kind: TokenKind::Rpar,
-                },
-                '[' => Token {
+                }),
+                '[' => Ok(Token {
                     text,
                     loc,
                     kind: TokenKind::LBracket,
-                },
-                ']' => Token {
+                }),
+                ']' => Ok(Token {
                     text,
                     loc,
                     kind: TokenKind::RBracket,
-                },
-                '{' => Token {
+                }),
+                '{' => Ok(Token {
                     text,
                     loc,
                     kind: TokenKind::LBrace,
-                },
-                '}' => Token {
+                }),
+                '}' => Ok(Token {
                     text,
                     loc,
                     kind: TokenKind::RBrace,
-                },
+                }),
                 _ if c.is_alphabetic() || c == '_' => {
-                    let mut c = self.advance();
-                    while is_ident_char(&c) {
-                        text.push(c);
-                        if self.is_empty() {
-                            break;
-                        }
-                        c = self.advance();
+                    while let Some(x) = self.advance_if(is_ident_char) {
+                        text.push(x);
                     }
-                    Token {
+                    Ok(Token {
                         text,
                         loc,
                         kind: TokenKind::Ident,
-                    }
+                    })
                 }
                 _ if c.is_numeric() => {
                     let mut kind = TokenKind::Int;
-                    c = self.advance();
-                    while is_number_char(&c) {
-                        text.push(c);
-                        if self.is_empty() {
-                            break;
-                        }
-                        if "eE.".contains(c) {
+                    while let Some(x) = self.advance_if(is_number_char) {
+                        text.push(x);
+                        if "eE.".contains(x) {
                             kind = TokenKind::Float;
                         };
-                        c = self.advance();
                     }
-                    Token { kind, text, loc }
+                    Ok(Token { kind, text, loc })
                 }
-                _ => Token {
-                    text,
-                    loc,
-                    kind: TokenKind::Unrecognized,
-                },
+                _ => {
+                    let unexpected = Token {
+                        text,
+                        loc: loc.clone(),
+                        kind: TokenKind::Unrecognized,
+                    };
+                    return Err(LexError::UnrecognizedToken(loc, unexpected));
+                }
             }
         } else {
             self.col += 1;
@@ -172,20 +173,9 @@ impl Lexer {
                 loc: self.loc(),
                 text: String::default(),
             };
-            eoitok
+            self.ended = true;
+            Ok(eoitok)
         }
-    }
-
-    pub fn pos(&self) -> (usize, usize, usize) {
-        (self.row, self.col, self.idx)
-    }
-
-    pub fn reset_pos(&mut self, mark: (usize, usize, usize)) {
-        (self.row, self.col, self.idx) = mark;
-    }
-
-    pub fn is_empty(&self) -> bool {
-        self.idx >= self.input.len() - 1
     }
 }
 
