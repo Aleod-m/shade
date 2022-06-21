@@ -1,9 +1,6 @@
 use std::io::Write;
+use shade::*;
 
-mod ast;
-mod lexer;
-mod types;
-//mod parser;
 
 #[derive(clap::Parser, Debug)]
 #[clap(author, version, about, long_about = None)]
@@ -16,6 +13,11 @@ struct Args {
 enum Commands {
     #[clap()]
     I,
+    #[clap()]
+    C,
+    #[clap()]
+    B,
+
 }
 
 fn main() -> std::io::Result<()> {
@@ -26,6 +28,8 @@ fn main() -> std::io::Result<()> {
 
     match args.command {
         Commands::I => interpret(),
+        Commands::C => check(),
+        Commands::B => build(),
     }
 }
 
@@ -48,8 +52,6 @@ fn interpret() -> std::io::Result<()> {
         }
         print!("\n> ");
     }
-    //let lexer = lexer::Lexer::new(line.chars(), None);
-    //let stmt  = parser::ValueParser::parse(lexer);
     Ok(())
 }
 
@@ -57,6 +59,6 @@ fn check() -> std::io::Result<()> {
     unimplemented!()
 }
 
-fn compile() -> std::io::Result<()> {
+fn build() -> std::io::Result<()> {
     unimplemented!()
 }
