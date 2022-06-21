@@ -1,11 +1,12 @@
 use std::{collections::HashMap, fmt::Display};
 
-#[derive(Debug, Clone, Copy, PartialEq)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum Type {
     Unit,
     Bool,
     Int,
     Float,
+    List(Box<Type>)
 }
 
 impl Display for Type {
@@ -16,6 +17,7 @@ impl Display for Type {
             Bool => write!(f, "bool"),
             Int => write!(f, "int"),
             Float => write!(f, "float"),
+            List(ty) => write!(f, "list {}", ty), 
         }
     }
 }
@@ -23,6 +25,7 @@ impl Display for Type {
 pub enum TypeError {
     OperatorError,
     TypedValueNotPresentInContext,
+    NonUniformTypeInList,
 }
 
 pub trait TypeCheckVisitor {

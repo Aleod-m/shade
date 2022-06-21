@@ -2,11 +2,12 @@ use std::collections::HashMap;
 
 use crate::types::{Type, TypeCheckVisitor, TypeError};
 
-#[derive(Debug, Clone, Copy, PartialEq)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum Value {
     Int(i32),
     Float(f32),
     Unit(()),
+    List(Vec<Value>)
 }
 
 impl Value {
@@ -16,7 +17,7 @@ impl Value {
 
     pub fn negate(&self) -> Self {
         use Value::*;
-        match *self {
+        match self {
             Int(val) => Int(-val),
             Float(val) => Float(-val),
             _ => unreachable!(),
@@ -25,7 +26,7 @@ impl Value {
 
     pub fn modulo(&self, other: Value) -> Value {
         use Value::*;
-        match (*self, other) {
+        match (self, other) {
             (Int(val), Int(other)) => Int(val % other),
             _ => unreachable!(),
         }
@@ -33,7 +34,7 @@ impl Value {
 
     pub fn add(&self, other: Self) -> Self  {
         use Value::*;
-        match (*self, other) {
+        match (self, other) {
             (Int(val), Int(other)) => Int(val + other),
             (Float(val), Float(other)) => Float(val + other),
             _ => unreachable!(),
@@ -42,7 +43,7 @@ impl Value {
 
     pub fn sub(&self, other: Self) -> Self {
         use Value::*;
-        match (*self, other) {
+        match (self, other) {
             (Int(val), Int(other)) => Int(val - other),
             (Float(val), Float(other)) => Float(val - other),
             _ => unreachable!(),
@@ -51,7 +52,7 @@ impl Value {
 
     pub fn mul(&self, other: Value) -> Value {
         use Value::*;
-        match (*self, other) {
+        match (self, other) {
             (Int(val), Int(other)) => Int(val * other),
             (Float(val), Float(other)) => Float(val * other),
             _ => unreachable!(),
@@ -60,7 +61,7 @@ impl Value {
 
     pub fn div(&self, other: Value) -> Value {
         use Value::*;
-        match (*self, other) {
+        match (self, other) {
             (Int(val), Int(other)) => Int(val / other),
             (Float(val), Float(other)) => Float(val / other),
             _ => unreachable!(),
@@ -75,6 +76,13 @@ impl TypeCheckVisitor for Value {
             Int(_) => Type::Int,
             Float(_) => Type::Float,
             Unit(_) => Type::Unit,
+            List(v) => v.iter().map(|v| v.ty_check(_context)).try_reduce(|first, second| {
+                if first == second {
+                    first
+                } else {
+                    Err(TypeError::NonUniformTypeInList)
+                }
+            }),
         })
     }
 }
@@ -91,3 +99,4 @@ macro_rules! into_value {
 into_value!(i32, Int);
 into_value!(f32, Float);
 into_value!((), Unit);
+into_value!(Vec<Value>, List);
