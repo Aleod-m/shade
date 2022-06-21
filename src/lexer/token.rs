@@ -19,7 +19,9 @@ impl fmt::Display for Loc {
 #[derive(Debug, PartialEq, Clone, Copy, Eq, Hash)]
 pub enum TokenKind {
     Ident,
+
     Colon,
+    Comma,
 
     Int,
     Float,
@@ -65,6 +67,7 @@ impl fmt::Display for TokenKind {
         match self {
             Ident => write!(f, "identifier"),
             Colon => write!(f, "colon"),
+            Comma => write!(f, "comma"),
             Unrecognized => write!(f, "unrecognized"),
             EOI => write!(f, "end of input"),
             Int => write!(f, "integer"),

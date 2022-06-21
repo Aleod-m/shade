@@ -42,16 +42,17 @@ impl<'a> Lexer<'a> {
     }
 
     fn trim_whitespaces(&mut self) {
-        while let Some(_) = self.input.next_if(|c| {
-            match c {
-                _ if c.is_whitespace() && *c != '\n' => {self.col += 1; true},
-                '\n' => {
-                    self.col = 0;
-                    self.row += 1;
-                    true
-                }
-                _ => false,
+        while let Some(_) = self.input.next_if(|c| match c {
+            _ if c.is_whitespace() && *c != '\n' => {
+                self.col += 1;
+                true
             }
+            '\n' => {
+                self.col = 0;
+                self.row += 1;
+                true
+            }
+            _ => false,
         }) {}
     }
 
@@ -60,10 +61,10 @@ impl<'a> Lexer<'a> {
         self.input.next()
     }
 
-    fn advance_if(&mut self,f: impl FnOnce(&char)->bool ) -> Option<char> {
+    fn advance_if(&mut self, f: impl FnOnce(&char) -> bool) -> Option<char> {
         let output = self.input.next_if(f);
         if output.is_some() {
-            self.col+=1;
+            self.col += 1;
         }
         output
     }
@@ -80,6 +81,11 @@ impl<'a> Lexer<'a> {
                 ':' => Ok(Token {
                     text,
                     kind: TokenKind::Colon,
+                    loc,
+                }),
+                ',' => Ok(Token {
+                    text,
+                    kind: TokenKind::Comma,
                     loc,
                 }),
                 '+' => Ok(Token {
@@ -147,12 +153,37 @@ impl<'a> Lexer<'a> {
                         kind: TokenKind::Ident,
                     })
                 }
+                '0' if self.advance_if(|c| *c == 'x').is_some() => {
+                    text.push('x');
+                    while let Some(c) = self.advance_if(is_hexa_int_char) {
+                        text.push(c)
+                    }
+                    Ok(Token {
+                        text,
+                        loc,
+                        kind: TokenKind::Int,
+                    })
+                }
+                '0' if self.advance_if(|c| *c == 'b').is_some() => {
+                    text.push('b');
+                    while let Some(c) = self.advance_if(is_bin_int_char) {
+                        text.push(c)
+                    }
+                    Ok(Token {
+                        text,
+                        loc,
+                        kind: TokenKind::Int,
+                    })
+                }
                 _ if c.is_numeric() => {
                     let mut kind = TokenKind::Int;
                     while let Some(x) = self.advance_if(is_number_char) {
                         text.push(x);
                         if "eE.".contains(x) {
                             kind = TokenKind::Float;
+                            if let Some(v) = self.advance_if(|c| "-+".contains(*c) && x != '.') {
+                                text.push(v);
+                            }
                         };
                     }
                     Ok(Token { kind, text, loc })
@@ -186,4 +217,20 @@ fn is_ident_char(x: &char) -> bool {
 fn is_number_char(x: &char) -> bool {
     let chars = "eE.";
     x.is_ascii_digit() || chars.contains(*x)
+}
+
+fn is_hexa_int_char(x: &char) -> bool {
+    x.is_ascii_digit() || "aAbBcCdDeEfF".contains(*x)
+}
+
+fn is_bin_int_char(x: &char) -> bool {
+    *x == '0' || *x == '1'
+}
+
+impl<'a> Iterator for Lexer<'a> {
+    type Item = Token;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        self.lex().ok()
+    }
 }
