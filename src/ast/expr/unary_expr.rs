@@ -5,7 +5,7 @@ use std::collections::HashMap;
 use super::{Op, Expr, Value};
 
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 pub struct UnaryExpr {
     pub op: Op,
     pub expr: Box<Expr>,

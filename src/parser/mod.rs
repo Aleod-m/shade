@@ -5,5 +5,6 @@ pub use internals::*;
 mod value;
 pub use value::*;
 
-mod arith;
-pub use arith::*;
+mod expr;
+pub use expr::*;
+
