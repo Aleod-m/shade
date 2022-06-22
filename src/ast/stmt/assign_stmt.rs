@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use crate::ast::{Expr, EvaluationError, Value};
+use crate::ast::{Expr, Value};
 
 pub struct AssignStmt {
     pub ident: String,

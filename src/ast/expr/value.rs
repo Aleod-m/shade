@@ -1,13 +1,9 @@
-use std::collections::HashMap;
-
-use crate::types::{Type, TypeCheckVisitor, TypeError};
-
 #[derive(Debug, Clone, PartialEq)]
 pub enum Value {
     Int(i32),
     Float(f32),
     Unit(()),
-    List(Vec<Value>)
+    List(Vec<Value>),
 }
 
 impl Value {
@@ -32,7 +28,7 @@ impl Value {
         }
     }
 
-    pub fn add(&self, other: Self) -> Self  {
+    pub fn add(&self, other: Self) -> Self {
         use Value::*;
         match (self, other) {
             (Int(val), Int(other)) => Int(val + other),
@@ -67,23 +63,15 @@ impl Value {
             _ => unreachable!(),
         }
     }
-}
 
-impl TypeCheckVisitor for Value {
-    fn ty_check(&self, _context: &mut HashMap<String, Type>) -> Result<Type, TypeError> {
+    pub(crate) fn eval(&self) -> Value {
         use Value::*;
-        Ok(match self {
-            Int(_) => Type::Int,
-            Float(_) => Type::Float,
-            Unit(_) => Type::Unit,
-            List(v) => v.iter().map(|v| v.ty_check(_context)).try_reduce(|first, second| {
-                if first == second {
-                    first
-                } else {
-                    Err(TypeError::NonUniformTypeInList)
-                }
-            }),
-        })
+        match self {
+            Int(v) => Int(*v),
+            Float(v) => Float(*v),
+            Unit(_) => Unit(()),
+            List(v) => List(v.to_vec()),
+        }
     }
 }
 

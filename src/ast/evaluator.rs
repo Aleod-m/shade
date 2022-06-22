@@ -23,9 +23,8 @@ impl Evaluator {
         expr.eval(&mut self.context)
     }
     
-    pub fn eval_stmt(&mut self, _stmt: Stmt) -> Result<(), EvaluationError> {
-        todo!()
-        //stmt.eval(self.context)
+    pub fn eval_stmt(&mut self, stmt: Stmt) -> Value  {
+        stmt.eval(&mut self.context)
     }
     
     pub fn get_val_in_ctx(&self, ident: String) -> Option<&Value> {

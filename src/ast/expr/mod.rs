@@ -9,7 +9,6 @@ pub use bin_expr::*;
 mod value;
 pub use value::*;
 
-use crate::types::{TypeCheckVisitor, TypeError, Type};
 
 #[derive(Debug)]
 pub enum Expr {
@@ -50,23 +49,23 @@ impl Expr {
         match self {
             Unary(uexpr) => uexpr.eval(context),
             Binary(bexpr) => bexpr.eval(context),
-            Value(val) => *val,
+            Value(val) => val.eval(),
             Ident(name) => context
                 .get(name)
-                .map(|val| *val)
+                .map(|val| val.eval())
                 .unwrap()
         }
     }
 }
 
-impl TypeCheckVisitor for Expr {
-    fn ty_check(&self, context: &mut HashMap<String, Type>) -> Result<Type, TypeError> {
-        use Expr::*;
-        match self {
-            Unary(uexpr) => uexpr.ty_check(context),
-            Binary(bexpr) => bexpr.ty_check(context),
-            Value(val) => val.ty_check(context),
-            Ident(name) => context.get(name).map(|ty| *ty).ok_or(TypeError::TypedValueNotPresentInContext),
-        }
-    }
-}
+//impl TypeCheckVisitor for Expr {
+//    fn ty_check(&self, context: &mut HashMap<String, Type>) -> Result<Type, TypeError> {
+//        use Expr::*;
+//        match self {
+//            Unary(uexpr) => uexpr.ty_check(context),
+//            Binary(bexpr) => bexpr.ty_check(context),
+//            Value(val) => val.ty_check(context),
+//            Ident(name) => context.get(name).map(|ty| *ty).ok_or(TypeError::TypedValueNotPresentInContext),
+//        }
+//    }
+//}

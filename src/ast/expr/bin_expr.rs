@@ -1,6 +1,5 @@
 use std::collections::HashMap;
 
-use crate::types::{Type, TypeCheckVisitor, TypeError};
 
 use super::{Expr, Op, Value};
 
@@ -26,18 +25,3 @@ impl BinaryExpr {
     }
 }
 
-impl TypeCheckVisitor for BinaryExpr {
-    fn ty_check(&self, context: &mut HashMap<String, Type>) -> Result<Type, TypeError> {
-        let lty = self.lhs.ty_check(context)?;
-        use Op::*;
-        match self.op {
-            Add | Sub | Mul | Div | Mod => {
-                if lty == self.rhs.ty_check(context)? {
-                    Ok(lty)
-                } else {
-                    Err(TypeError::OperatorError)
-                }
-            }
-        }
-    }
-}

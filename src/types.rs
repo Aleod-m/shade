@@ -6,7 +6,8 @@ pub enum Type {
     Bool,
     Int,
     Float,
-    List(Box<Type>)
+    List(Box<Type>),
+    Undefined,
 }
 
 impl Display for Type {
@@ -18,6 +19,7 @@ impl Display for Type {
             Int => write!(f, "int"),
             Float => write!(f, "float"),
             List(ty) => write!(f, "list {}", ty), 
+            Undefined => write!(f, "undefined type"), 
         }
     }
 }
@@ -27,6 +29,8 @@ pub enum TypeError {
     TypedValueNotPresentInContext,
     NonUniformTypeInList,
 }
+
+pub type TypeRes = Result<Type, TypeError>;
 
 pub trait TypeCheckVisitor {
     fn ty_check(&self, context: &mut HashMap<String, Type>) -> Result<Type, TypeError>;
