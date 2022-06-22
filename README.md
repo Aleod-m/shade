@@ -50,11 +50,14 @@ Or will need to be provided to the functions. All the functions will be systems.
 
 ### Inspirations
 Shade is a functional language it has a syntax inspired by elm and nix. It has type inference as well as genericity.
-Its syntax is designed to be as non intrusive as possible. There in not a single reserved keyword. This come to the cost of more characters to do what keywords do.
+Its syntax is designed to be as non intrusive as possible. There in not a single reserved keyword. This implicates 
+the use of more special characters and operators to do what keywords do.
 
 ### Comments
-Line comments are defined with `--`.
-And block comments with `-{` for the oppening and `}-` for the closing.
+Line comments are defined with `--`
+and block comments with `-{` for the oppening and `}-` for the closing.
+
+No syntax yet for Documentation comments.
 
 ### Functions
 All function are anonymous and values. To declare a function use the `:` symbol. All functions take one argument.
@@ -65,17 +68,17 @@ x: x * 2
 To make a function that takes no argument simply omit the variable name.
 Here is a function that always return 2:
 ```
-: 2
+: 2 -- This is also equivalent to (): 2 
 ```
 
-To make functions with multiple arguments we use a concept called currying. make a function that returns anoter function.
+To make functions with multiple arguments we use a concept called currying, making a function returning another function.
 So here is a function that adds two numbers.
 ```
 a: b: a + b
 ```
 To call anonymous functions simply pass arguments as such:
 ```
-(a: b: a + b) 1 2 -- 3
+(a: b: a + b) 1 2 -- This expression returns 3.
 ```
 
 To keep the function around you can assign them to a identifier:
@@ -88,7 +91,7 @@ As mentioned previously shade supports currying:
 ```
 add_one = add 1 
 
-add_one 2 -- 3
+add_one 2 -- This expression returns 3.
 ```
 
 There are several operators on functions.
@@ -97,9 +100,9 @@ The pipe operator allows to chain functions:
 ```
 10 
     |> add_one
-    |> print
+    |> print  -- prints 10 in the terminal.
 ```
-is equivalent to:
+This is equivalent to:
 ```
 print (add_one 10)
 ```
