@@ -3,7 +3,7 @@ use std::collections::HashMap;
 
 use super::{Expr, Op, Value};
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 pub struct BinaryExpr {
     pub lhs: Box<Expr>,
     pub op: Op,

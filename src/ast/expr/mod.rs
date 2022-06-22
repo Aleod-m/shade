@@ -10,7 +10,7 @@ mod value;
 pub use value::*;
 
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 pub enum Expr {
     Unary(UnaryExpr),
     Binary(BinaryExpr),
