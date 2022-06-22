@@ -1,192 +1,121 @@
-use std::marker::PhantomData;
-
+use super::{Parser, ParseError};
 use crate::lexer::Token;
 
-use super::{ParseError, Parser, ParserRes};
-
-pub struct Map<P, G, O>
+pub fn map<'a, P, F, O1, O2>(parser: P, f: F) -> impl Parser<'a, O2>
 where
-    P: Parser,
-    G: Fn(P::Output) -> O,
+    P: Parser<'a,  O1>,
+    F: Fn(O1) -> O2,
 {
-    pub p: P,
-    pub g: G,
-    pub _m: core::marker::PhantomData<G::Output>,
+    move |input: &'a [Token]| parser(input).map(|(input, val)| (input, f(val)))
 }
 
-impl<P, G, O> Parser for Map<P, G, O>
+pub fn not<'a, P, O>(parser: P) -> impl Parser<'a, ()>
 where
-    P: Parser,
-    G: Fn(P::Output) -> O,
+    P: Parser<'a,  O>,
 {
-    type Output = G::Output;
-    fn parse<'a>(&self, input: &'a [Token]) -> ParserRes<'a, Self::Output> {
-        let parse = self.p.parse_or_reset(input);
-        match parse {
-            Ok((input, res)) => Ok((input, (self.g)(res))),
-            Err(e) => Err(e),
+    move |input: &'a [Token]| match parser(input) {
+        Ok(_) => Err((input, ParseError::ParserFailed)),
+        Err((input, _)) => Ok((input, ())),
+    }
+}
+
+pub fn opt<'a, P, O>(parser: P) -> impl Parser<'a, Option<O>>
+where
+    P: Parser<'a,  O>,
+{
+    move |input: &'a [Token]| match parser(input) {
+        Ok((input, val)) => Ok((input, Some(val))),
+        Err(_) => Ok((input, None)),
+    }
+}
+
+pub fn many0<'a, P, O>(parser: P) -> impl Parser<'a, Vec<O>>
+where
+    P: Parser<'a,  O>,
+{
+    move |input: &'a [Token]| {
+        let mut vals = Vec::new();
+        let mut i = input;
+        while let Ok((ri, v)) = parser(i) {
+            i = ri;
+            vals.push(v);
         }
+        Ok((i, vals))
     }
 }
 
-pub struct Or<P1, P2, O>
+pub fn many1<'a, P, O>(parser: P) -> impl Parser<'a, Vec<O>>
 where
-    P1: Parser<Output = O>,
-    P2: Parser<Output = O>,
+    P: Parser<'a,  O>,
 {
-    pub f: P1,
-    pub s: P2,
-    pub _m : PhantomData<P1::Output>,
-}
-
-impl<P1, P2, O> Parser for Or<P1, P2, O>
-where
-    P1: Parser<Output = O>,
-    P2: Parser<Output = O>,
-{
-    type Output = O;
-    fn parse<'a>(&self, input: &'a [Token]) -> ParserRes<'a, Self::Output> {
-        self.f
-            .parse_or_reset(input)
-            .or_else(|(input, _)| self.s.parse_or_reset(input))
-    }
-}
-
-pub struct And<P1, P2>
-where
-    P1: Parser,
-    P2: Parser,
-{
-    pub f: P1,
-    pub s: P2,
-    pub _m1: core::marker::PhantomData<P1::Output>,
-    pub _m2: core::marker::PhantomData<P2::Output>,
-}
-
-impl<P1, P2> Parser for And<P1, P2>
-where
-    P1: Parser,
-    P2: Parser,
-{
-    type Output = (P1::Output, P2::Output);
-    fn parse<'a>(&self, input: &'a[Token]) -> ParserRes<'a, Self::Output> {
-        let (input, result1) = self.f.parse_or_reset(input)?;
-        self.s
-            .parse_or_reset(input)
-            .map(|(input, result2)| Ok((input, (result1, result2))))?
-    }
-}
-
-pub struct Not<P>
-where
-    P: Parser,
-{
-    pub f: P,
-    pub _m: core::marker::PhantomData<P::Output>,
-}
-
-impl<P> Parser for Not<P>
-where
-    P: Parser,
-{
-    type Output = ();
-    fn parse<'a>(&self, input: &'a[Token]) -> ParserRes<'a, Self::Output> {
-        let parse = self.f.parse_and_reset(input);
-        match parse {
-            Ok((input, _)) => {
-                return Err((input, ParseError::ParserFailed));
+    move |input: &'a [Token]| {
+        let mut vals = Vec::new();
+        let mut i = input;
+        if let Ok((ri, v)) = parser(i) {
+            i = ri;
+            vals.push(v);
+            while let Ok((ri, v)) = parser(i) {
+                i = ri;
+                vals.push(v);
             }
-            Err((input, _)) => return Ok((input, ())),
+            Ok((i, vals))
+        } else {
+            Err((input, ParseError::ParserFailed))
         }
     }
 }
 
-pub struct Peek<P>
+pub fn and<'a, P1, P2, O1, O2>(p1: P1, p2: P2) -> impl Parser<'a, (O1, O2)>
 where
-    P: Parser,
+    P1: Parser<'a,  O1>,
+    P2: Parser<'a,  O2>,
 {
-    pub f: P,
-    pub _m: core::marker::PhantomData<P::Output>,
-}
-
-impl<P> Parser for Peek<P>
-where
-    P: Parser,
-{
-    type Output = P::Output;
-    fn parse<'a>(&self, input: &'a[Token]) -> ParserRes<'a, Self::Output> {
-        self.f.parse_and_reset(input)
+    move |input: &'a [Token]| {
+        let (input, result1) = p1(input)?;
+        p2(input).map(|(input, result2)| Ok((input, (result1, result2))))?
     }
 }
 
-pub struct OneOrMore<P>
-where
-    P: Parser,
-{
-    pub p: P,
-    pub _m: core::marker::PhantomData<P::Output>,
-}
 
-impl<P> Parser for OneOrMore<P>
+pub fn or<'a, P1, P2, O>(p1: P1, p2: P2) -> impl Parser<'a, O>
 where
-    P: Parser,
+    P1: Parser<'a,  O>,
+    P2: Parser<'a,  O>,
 {
-    type Output = Vec<P::Output>;
-
-    fn parse<'a>(&self, input: &'a[Token]) -> ParserRes<'a, Self::Output> {
-        let mut input = input;
-        let mut result = vec![];
-        match self.p.parse(input) {
-            Ok((lex, res)) => {
-                input = lex;
-                result.push(res);
-            }
-            Err(e) => return Err(e),
-        }
-        loop {
-            match self.p.parse(input) {
-                Ok((lex, res)) => {
-                    input = lex;
-                    result.push(res);
-                }
-                Err((lex, _)) => {
-                    input = lex;
-                    break;
-                }
-            }
-        }
-        return Ok((input, result));
+    move |input: &'a [Token]| {
+        p1(input)
+            .or_else(|(input, _)| p2(input))
     }
 }
 
-pub struct ZeroOrMore<P>
+pub fn between<'a, LP, P, RP, LO, O, RO>(p: P, lp: LP, rp: RP) -> impl Parser<'a, (LO, O, RO)>
 where
-    P: Parser,
+    LP: Parser<'a,  LO>,
+    P: Parser<'a,  O>,
+    RP: Parser<'a,  RO>
 {
-    pub p: P,
-    pub _m: core::marker::PhantomData<P::Output>,
-}
-
-impl<P> Parser for ZeroOrMore<P>
-where
-    P: Parser,
-{
-    type Output = Vec<P::Output>;
-    fn parse<'a>(&self, input: &'a[Token]) -> ParserRes<'a, Self::Output> {
-        let mut input = input;
-        let mut result = vec![];
-        loop {
-            match self.p.parse(input) {
-                Ok((lex, res)) => {
-                    input = lex;
-                    result.push(res);
-                }
-                Err((lex, _)) => {
-                    input = lex;
-                    break;
-                }
-            }
-        }
-        return Ok((input, result));
+    move |input: &'a [Token]| {
+        let (ri, lval) = lp(input)?;
+        let (ri, val) = p(ri)?;
+        let (ri, rval) = rp(ri)?;
+        Ok((ri, (lval, val, rval)))
     }
 }
+
+//pub fn ordered_choice<'a, P, O, I>(ps: I) -> impl Parser<'a, O> 
+//where
+//    P: Parser<'a,  O>,
+//    I: IntoIterator<Item = P>,
+//{
+//    move |input: &'a [Token]| {
+//        let res;
+//        for p in ps.into_iter() {
+//            res = p(input);
+//            if res.is_ok() {
+//               return res; 
+//            }
+//        }
+//        return res;
+//    }
+//
+//}
