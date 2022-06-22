@@ -1,10 +1,20 @@
-use crate::{ast::{Expr, Op}, lexer::{TokenKind, Token}};
+use crate::{
+    ast::{Expr, Op},
+    lexer::{Token, TokenKind},
+};
 
-use super::{combinator::{or, many0, and, map, between}, token, number_parser};
+use super::{
+    combinator::{and, between, many0, map, or},
+    token,
+};
 
+mod value;
+pub use value::*;
 
+mod op;
+pub use op::*;
 
-mk_parsers!{
+mk_parsers! {
     input: &'a [Token];
 
     /// Term <- Number | '(' Expr ')'
@@ -24,53 +34,52 @@ mk_parsers!{
 
     /// UnaryExpr <- ('+' | '-') Term
     pub unary_parser() > Expr = {
-            map(
-                and(
-                    or(token(TokenKind::Plus), token(TokenKind::Dash)),
-                    term_parser(),
-                ),
-                |(token, term)| Expr::unary(Op::from_token_kind(token.kind).unwrap(), term),
-            )(input)
-        
+        map(
+            and(
+                or(op_parser(Op::Add), op_parser(Op::Sub)),
+                term_parser(),
+            ),
+            |(op, term)| Expr::unary(op, term),
+        )(input)
     };
 
     /// Product <- Term (('*' | '/') Term)*
      product_parser() > Expr = {
-            map(
-                and(
+        map(
+            and(
+                term_parser(),
+                many0(and(
+                    or(op_parser(Op::Mul), op_parser(Op::Div)),
                     term_parser(),
-                    many0(and(
-                        or(token(TokenKind::Star), token(TokenKind::Slash)),
-                        term_parser(),
-                    )),
-                ),
-                |(expr, others): (Expr, Vec<(Token, Expr)>)| {
-                    others.into_iter().fold(expr, |lhs, (op_tok, rhs)| {
-                        Expr::binary(Op::from_token_kind(op_tok.kind).unwrap(), lhs, rhs)
-                    })
-                },
-            )(input)
-        };
-    
+                )),
+            ),
+            |(expr, others): (Expr, Vec<(Op, Expr)>)| {
+                others.into_iter().fold(expr, |lhs, (op, rhs)| {
+                    Expr::binary(op, lhs, rhs)
+                })
+            },
+        )(input)
+    };
+
 
     /// BinExpr <- Product (('+' | '-') Product)*
      binary_parser() > Expr = {
-            map(
-                and(
+        map(
+            and(
+                product_parser(),
+                many0(and(
+                    or(op_parser(Op::Add), op_parser(Op::Sub)),
                     product_parser(),
-                    many0(and(
-                        or(token(TokenKind::Plus), token(TokenKind::Dash)),
-                        product_parser(),
-                    )),
-                ),
-                |(expr, others): (Expr, Vec<(Token, Expr)>)| {
-                    others.into_iter().fold(expr, |lhs, (op_tok, rhs)| {
-                        Expr::binary(Op::from_token_kind(op_tok.kind).unwrap(), lhs, rhs)
-                    })
-                },
-            )(input)
-        };
-    
+                )),
+            ),
+            |(expr, others): (Expr, Vec<(Op, Expr)>)| {
+                others.into_iter().fold(expr, |lhs, (op, rhs)| {
+                    Expr::binary(op, lhs, rhs)
+                })
+            },
+        )(input)
+    };
+
 
     /// Expr <- BinExpr | UnaryExpr | Ident | Value
     pub expr_parser() > Expr = {
@@ -78,10 +87,13 @@ mk_parsers!{
     }
 }
 
-
 #[cfg(test)]
 mod test {
-    use crate::{lexer::{Lexer, Token}, parser::{ParseError, expr::binary_parser}, ast::{Expr, Op}};
+    use crate::{
+        ast::{Expr, Op},
+        lexer::{Lexer, Token},
+        parser::{expr::binary_parser, ParseError},
+    };
 
     use super::unary_parser;
 
@@ -98,18 +110,13 @@ mod test {
         let input: Vec<Token> = Lexer::new("3 * 5 + 2".chars(), None).collect();
         let parse_res: Expr = binary_parser()(&input).unwrap().1;
         let expected: Expr = Expr::binary(
-            Op::Add, 
-            Expr::binary(
-                Op::Mul,
-                Expr::value(3),
-                Expr::value(5),
-            ), 
+            Op::Add,
+            Expr::binary(Op::Mul, Expr::value(3), Expr::value(5)),
             Expr::value(2),
         );
         assert_eq!(parse_res, expected);
         Ok(())
     }
-
 
     #[test]
     fn test_parse_binary_with_term() -> Result<(), ParseError> {
@@ -118,11 +125,7 @@ mod test {
         let expected: Expr = Expr::binary(
             Op::Mul,
             Expr::value(3),
-            Expr::binary(
-                Op::Add, 
-                Expr::value(5),
-                Expr::value(2),
-            ), 
+            Expr::binary(Op::Add, Expr::value(5), Expr::value(2)),
         );
         assert_eq!(parse_res, expected);
         Ok(())
@@ -135,11 +138,7 @@ mod test {
         let expected: Expr = Expr::binary(
             Op::Mul,
             Expr::value(3.),
-            Expr::binary(
-                Op::Add, 
-                Expr::value(5e-1),
-                Expr::value(2.),
-            ), 
+            Expr::binary(Op::Add, Expr::value(5e-1), Expr::value(2.)),
         );
         assert_eq!(parse_res, expected);
         Ok(())

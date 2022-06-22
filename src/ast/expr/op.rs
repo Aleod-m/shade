@@ -10,6 +10,7 @@ pub enum Op {
     Mul,
     Div,
     Mod,
+    Pipe,
 }
 
 impl Op {
@@ -46,6 +47,7 @@ impl Op {
         match self {
             Add | Sub => 1,
             Mul | Div | Mod => 2,
+            Pipe => 0,
         }
     }
 }
@@ -59,6 +61,7 @@ impl fmt::Display for Op {
             Mul => write!(f, "*"),
             Div => write!(f, "/"),
             Mod => write!(f, "%"),
+            Pipe => write!(f, "|>"),
         }
     }
 }

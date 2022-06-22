@@ -31,6 +31,8 @@ pub enum TokenKind {
     Star,
     Slash,
     Percent,
+    Bar,
+    Bang,
 
     Lpar,
     Rpar,
@@ -38,6 +40,8 @@ pub enum TokenKind {
     RBracket,
     LBrace,
     RBrace,
+    LT,
+    GT,
 
     Unrecognized,
     EOI,
@@ -83,6 +87,10 @@ impl fmt::Display for TokenKind {
             RBracket => write!(f, "right bracket"),
             LBrace => write!(f, "left brace"),
             RBrace => write!(f, "right brace"),
+            Bar => write!(f, "bar"),
+            Bang => write!(f, "bang"),
+            LT => write!(f, "less than"),
+            GT => write!(f, "greater than"),
         }
     }
 }

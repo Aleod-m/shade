@@ -5,7 +5,7 @@ use crate::{
 
 use super::{
     token,
-    combinator::{and, map, or},
+    super::combinator::{and, map, or},
 };
 
 mk_parsers! {

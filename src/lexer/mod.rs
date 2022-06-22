@@ -113,6 +113,16 @@ impl<'a> Lexer<'a> {
                     loc,
                     kind: TokenKind::Percent,
                 }),
+                '!' => Ok(Token {
+                    text,
+                    loc,
+                    kind: TokenKind::Bang,
+                }),
+                '|' => Ok(Token {
+                    text,
+                    loc,
+                    kind: TokenKind::Bar,
+                }),
                 '(' => Ok(Token {
                     text,
                     loc,
@@ -142,6 +152,16 @@ impl<'a> Lexer<'a> {
                     text,
                     loc,
                     kind: TokenKind::RBrace,
+                }),
+                '<' => Ok(Token {
+                    text,
+                    loc,
+                    kind: TokenKind::LT,
+                }),
+                '>' => Ok(Token {
+                    text,
+                    loc,
+                    kind: TokenKind::GT,
                 }),
                 _ if c.is_alphabetic() || c == '_' => {
                     while let Some(x) = self.advance_if(is_ident_char) {
