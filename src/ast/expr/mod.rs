@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::{collections::HashMap, ops::Deref};
 
 mod op;
 pub use op::*;
@@ -9,13 +9,29 @@ pub use bin_expr::*;
 mod value;
 pub use value::*;
 
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub struct Ident(String);
 
-#[derive(Debug, PartialEq)]
+impl Deref for Ident {
+    type Target = String;
+
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+
+impl From<String> for Ident {
+    fn from(s: String) -> Self {
+        Ident(s)
+    }
+}
+
+#[derive(Debug, Clone, PartialEq)]
 pub enum Expr {
     Unary(UnaryExpr),
     Binary(BinaryExpr),
     Value(Value),
-    Ident(String),
+    Ident(Ident),
 }
 
 impl Expr {
@@ -44,16 +60,16 @@ impl Expr {
         Self::Value(val.into())
     }
 
-    pub fn eval(&self, context: &mut HashMap<String, Value>) -> Value {
+    pub fn eval(&self, context: &mut HashMap<Ident, Value>) -> Value {
         use Expr::*;
         match self {
             Unary(uexpr) => uexpr.eval(context),
             Binary(bexpr) => bexpr.eval(context),
-            Value(val) => val.eval(),
-            Ident(name) => context
-                .get(name)
-                .map(|val| val.eval())
-                .unwrap()
+            Value(val) => val.eval(context),
+            Ident(name) => {
+                let ident_val = context.get(name).unwrap().clone();
+                ident_val.eval(context)
+            }
         }
     }
 }

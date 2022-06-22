@@ -1,9 +1,9 @@
 use std::collections::HashMap;
 
 
-use super::{Expr, Op, Value};
+use super::{Expr, Op, Value, Ident};
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct BinaryExpr {
     pub lhs: Box<Expr>,
     pub op: Op,
@@ -11,7 +11,7 @@ pub struct BinaryExpr {
 }
 
 impl BinaryExpr {
-    pub fn eval(&self, context: &mut HashMap<String, Value>) -> Value  {
+    pub fn eval(&self, context: &mut HashMap<Ident, Value>) -> Value  {
         let lhs = self.lhs.eval(context);
         let rhs = self.rhs.eval(context);
         match self.op {

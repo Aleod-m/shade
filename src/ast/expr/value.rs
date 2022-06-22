@@ -1,9 +1,14 @@
+use std::collections::HashMap;
+
+use super::{Expr, Ident};
+
 #[derive(Debug, Clone, PartialEq)]
 pub enum Value {
     Int(i32),
     Float(f32),
     Unit(()),
     List(Vec<Value>),
+    Function(Option<Ident>, Box<Expr>),
 }
 
 impl Value {
@@ -64,13 +69,14 @@ impl Value {
         }
     }
 
-    pub(crate) fn eval(&self) -> Value {
+    pub(crate) fn eval(&self, context: &mut HashMap<Ident, Value>) -> Value {
         use Value::*;
         match self {
             Int(v) => Int(*v),
             Float(v) => Float(*v),
             Unit(_) => Unit(()),
             List(v) => List(v.to_vec()),
+            Function(ident, expr) => expr.eval(context),
         }
     }
 }
