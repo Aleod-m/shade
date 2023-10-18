@@ -2,28 +2,6 @@ use std::fmt::Display;
 
 use crate::lexer;
 
-//pub mod def;
-//pub mod expr;
-//pub mod ty;
-
-//pub struct Module {
-//    defs: Vec<def::Def>,
-//}
-
-pub enum ParseError {
-    ExpectedSOI,
-    ExpectedEOI,
-}
-
-pub type NodeHandle = usize;
-
-pub struct ParsedBuffer {
-    children: Vec<Vec<NodeHandle>>,
-    kinds: Vec<NodeKind>,
-    tk: Vec<lexer::TkHandle>,
-}
-
-
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum NodeKind {
     // Function Declaraiton

@@ -1,6 +1,7 @@
 #[macro_use]
 mod internals;
 
+pub mod parsetree;
 pub use internals::*;
 use thiserror::Error;
 
@@ -11,10 +12,8 @@ pub enum ParseError {
     NONE,
 }
 
-use crate::{
-    ast::NodeKind,
-    lexer::token::TkKind,
-};
+use parsetree::NodeKind;
+use crate::lexer::token::TkKind;
 
 use ParserRes::*;
 
