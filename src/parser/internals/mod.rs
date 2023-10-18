@@ -1,61 +1,103 @@
-use crate::ast::Stmt;
-use crate::lexer::{Token, TokenKind};
-
+#[macro_use]
 pub mod combinator;
+pub mod state;
 
 #[derive(Debug)]
-pub enum ParseError {
-    UnexpectedToken(Token),
-    UnexpectedEOI,
-    ParserFailed,
-    ValueParsedErroned,
+pub enum ParserRes {
+    Succ,
+    Fail,
 }
 
-pub struct ParserState {
-    context: Vec<Stmt>,
-}
+/// The type of a parser.
+pub trait Parser: Fn(&mut state::ParserState) -> ParserRes {}
 
-impl ParserState {
-    pub fn new() -> Self {
-        Self {
-            context: Vec::new(),
-        }
-    }
-}
-
-pub type ParserRes<'a, O> = Result<(&'a [Token], O), (&'a [Token], ParseError)>;
-
-pub trait Parser<'a, O> : Fn(&'a[Token]) -> ParserRes<'a, O> {}
-impl<'a, T, O> Parser<'a, O> for T
+impl<T> Parser for T
 where
-    T: Fn(&'a[Token]) -> ParserRes<'a, O> {}
+    T: Fn(&mut state::ParserState) -> ParserRes,
+{ }
 
-/// Here is a macro for automating parser creation.
+/// A dsl for writing most of the boilerplate while writing your grammar.
+#[macro_export]
 macro_rules! mk_parsers {
     (
-    $input:ident : $inty:ty;
-    $($(#[doc= $doc:expr])*$v:vis $name:ident($($param:ident : $pty:ty),*) > $output:ty = $rule:expr);+
+    input = $input:ident;
+    $($(#[doc= $doc:expr])*$v:vis $name:ident($($param:ident : $pty:ty),*) = $rule:tt);+
     ) => {
         $(
             $(#[doc = $doc])*
-            $v fn $name<'a>($($param:$pty),*) -> impl crate::parser::internals::Parser<'a, $output> {
-                move |$input: $inty| {
-                    $rule
+            $v fn $name($($param:$pty),*) -> impl crate::parser::internals::Parser {
+                #[allow(unused_mut)]
+                move |mut $input: &mut crate::parser::internals::state::ParserState| {
+                    let state = $input.save();
+                    mk_rule!($input, $rule, state)
                 }
+                
             }
         )+
     };
 }
 
-mk_parsers!{
-    input: &'a [Token];
+macro_rules! mk_rule {
+    (
+        $in:ident,
+        ( seq:
+            $($p:expr => { $($op:ident $($val:expr)?);* })*
+            $(; after { $($op_:ident $($val_:expr)?);* })?
+        )
+        , $state:ident
+    ) => { {
+        $(
+            match $p($in) {
+                crate::parser::ParserRes::Succ => { $(mk_seq!($in, $op $($val)?));* },
+                f @ crate::parser::ParserRes::Fail => {
+                    $in.restore($state);
+                    return f;
+                }
+            }
+        )*
+        $(
+            $(mk_seq!($in, $op_ $($val_)?));*;
+        )?
+            return crate::parser::ParserRes::Succ; 
+    } };
+    (
+        $in:ident,
+        (choice:
+            $(; $p:expr)*
+        )
+        , $state:ident
+    ) => { {
+        $(
+            if let crate::parser::ParserRes::Succ = $p($in) {
+                return crate::parser::ParserRes::Succ; 
+            }
+        )*
+            $in.restore($state);
+            return crate::parser::ParserRes::Fail; 
+        } };
+    (
+        $in:ident,
+        (expr :
+            $p:expr
+        )
+        , $state:ident
+    ) => { {
+        let res = $p;
+        if let crate::parser::ParserRes::Fail = res {
+            $in.restore($state);
+        }
+        res
+    } }
+}
 
-    /// The most basic parser that parses a single token:
-    /// - Succed if the next token in the input is of `kind`.
-    /// - Fails otherwise.
-    pub token(kind : TokenKind) > Token = match input.first() {
-        Some(tok) if tok.kind == kind => Ok((&input[1..], tok.clone())),
-        Some(tok) => Err((input, ParseError::UnexpectedToken(tok.clone()))),
-        None => Err((input, ParseError::UnexpectedEOI)),
-    }
+macro_rules! mk_seq {
+    ($in: ident, push $val:expr) => {
+        $in.push_node($val)
+    };
+    ($in: ident, stack $val:expr) => {
+        $in.stack_node($val)
+    };
+    ($in: ident, pop) => {
+        $in.pop_node()
+    };
 }

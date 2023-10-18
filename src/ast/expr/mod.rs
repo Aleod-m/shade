@@ -1,4 +1,4 @@
-use std::{collections::HashMap, ops::Deref};
+use super::Ident;
 
 mod op;
 pub use op::*;
@@ -8,23 +8,6 @@ mod bin_expr;
 pub use bin_expr::*;
 mod value;
 pub use value::*;
-
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
-pub struct Ident(String);
-
-impl Deref for Ident {
-    type Target = String;
-
-    fn deref(&self) -> &Self::Target {
-        &self.0
-    }
-}
-
-impl From<String> for Ident {
-    fn from(s: String) -> Self {
-        Ident(s)
-    }
-}
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum Expr {
@@ -59,29 +42,4 @@ impl Expr {
     pub fn value(val: impl Into<Value>) -> Self {
         Self::Value(val.into())
     }
-
-    pub fn eval(&self, context: &mut HashMap<Ident, Value>) -> Value {
-        use Expr::*;
-        match self {
-            Unary(uexpr) => uexpr.eval(context),
-            Binary(bexpr) => bexpr.eval(context),
-            Value(val) => val.eval(context),
-            Ident(name) => {
-                let ident_val = context.get(name).unwrap().clone();
-                ident_val.eval(context)
-            }
-        }
-    }
 }
-
-//impl TypeCheckVisitor for Expr {
-//    fn ty_check(&self, context: &mut HashMap<String, Type>) -> Result<Type, TypeError> {
-//        use Expr::*;
-//        match self {
-//            Unary(uexpr) => uexpr.ty_check(context),
-//            Binary(bexpr) => bexpr.ty_check(context),
-//            Value(val) => val.ty_check(context),
-//            Ident(name) => context.get(name).map(|ty| *ty).ok_or(TypeError::TypedValueNotPresentInContext),
-//        }
-//    }
-//}

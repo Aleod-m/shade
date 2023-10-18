@@ -1,25 +1,43 @@
 use core::fmt;
 
+/// NOT > XOR > AND > OR
+/// Mod, Mul, Div > Add, Sub
 
-use crate::lexer::TokenKind;
-#[derive(Debug, Clone, Copy, PartialEq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[non_exhaustive]
 pub enum Op {
+    // Arithmetic Opreators
     Add,
     Sub,
     Mul,
     Div,
     Mod,
-    Pipe,
+    // Function Operators
+    Pipe, // "a |> b c" -> b c f
+    Dot, // "a.b c"  -> b a c
+    // Boolean Opreators
+    Eq,
+    Neq,
+    Not,
+    Xor,
+    And,
+    Or,
 }
 
 impl Op {
     pub fn is_bin_op(&self) -> bool {
         use Op::*;
-        if let Add | Sub | Mul | Div | Mod = self {
-            true
-        } else {
-            false
+        match self {
+            Add | Sub | Mul | Div | Mod => true,
+            _ => false,
+        }
+    }
+
+    pub fn is_bool_op(&self) -> bool {
+        use Op::*;
+        match self {
+            Not | Xor | And | Or => true,
+            _ => false,
         }
     }
 
@@ -31,23 +49,13 @@ impl Op {
         }
     }
 
-    pub fn from_token_kind(kind: TokenKind) -> Option<Self> {
-        use TokenKind::*;
-        match kind {
-            Plus => Some(Op::Add),
-            Dash => Some(Op::Sub),
-            Star => Some(Op::Mul),
-            Slash => Some(Op::Div),
-            Percent => Some(Op::Mod),
-            _ => None,
-        }
-    }
     fn prec(&self) -> usize {
         use Op::*;
         match self {
             Add | Sub => 1,
             Mul | Div | Mod => 2,
             Pipe => 0,
+            _ => 0,
         }
     }
 }
@@ -62,7 +70,12 @@ impl fmt::Display for Op {
             Div => write!(f, "/"),
             Mod => write!(f, "%"),
             Pipe => write!(f, "|>"),
+            Not => write!(f, "!"),
+            Xor => write!(f, "^"),
+            And => write!(f, "&&"),
+            Or => write!(f, "||"),
+            Eq => write!(f, "=="),
+            Neq => write!(f, "!="),
         }
     }
 }
-

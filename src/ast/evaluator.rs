@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use super::{Expr, Value, Stmt, Ident};
+use super::{Expr, Value, Def, Ident};
 
 #[derive(Debug, PartialEq)]
 pub enum EvaluationError {
@@ -23,7 +23,7 @@ impl Evaluator {
         expr.eval(&mut self.context)
     }
     
-    pub fn eval_stmt(&mut self, stmt: Stmt) -> Value  {
+    pub fn eval_stmt(&mut self, stmt: Def) -> Value  {
         stmt.eval(&mut self.context)
     }
     
@@ -34,7 +34,7 @@ impl Evaluator {
 
 #[cfg(test)]
 pub mod test {
-    use crate::ast::{Value, Expr, Op, Stmt};
+    use crate::ast::{Value, Expr, Op, Def};
 
     use super::Evaluator;
 
@@ -50,7 +50,7 @@ pub mod test {
 
     #[test]
     fn eval_statement() {
-        let stmt = Stmt::assign("a".to_string().into(), Expr::value(122i32));
+        let stmt = Def::assign("a".to_string().into(), Expr::value(122i32));
         let mut ev = Evaluator::new();
         let _ = ev.eval_stmt(stmt);
         assert_eq!(ev.get_val_in_ctx("a".to_string().into()), Some(&Value::new(122i32)));

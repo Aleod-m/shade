@@ -1,58 +1,62 @@
-use std::io::Write;
-use shade::*;
+//use shade::{lexer::Token, parser::def_parser, *};
 
+use clap::{Parser, Subcommand};
 
-#[derive(clap::Parser, Debug)]
+#[derive(Parser, Debug)]
 #[clap(author, version, about, long_about = None)]
 struct Args {
     #[clap(subcommand)]
     command: Commands,
 }
 
-#[derive(clap::Subcommand, Debug)]
+#[derive(Subcommand, Debug)]
 enum Commands {
     #[clap()]
-    I,
+    Interpret,
     #[clap()]
-    C,
+    Check,
     #[clap()]
-    B,
-
+    Build,
+    #[clap()]
+    Run,
 }
 
 fn main() -> std::io::Result<()> {
-    let args = {
-        use clap::Parser;
-        Args::parse()
-    };
+    let args = Args::parse();
 
     match args.command {
-        Commands::I => interpret(),
-        Commands::C => check(),
-        Commands::B => build(),
+        Commands::Interpret => interpret(),
+        Commands::Check => check(),
+        Commands::Build => build(),
+        Commands::Run => run(),
     }
 }
 
 fn interpret() -> std::io::Result<()> {
-    println!("interpret");
-    let mut line = String::new();
-    print!("> ");
-    loop {
-        std::io::stdout().flush()?;
-        line.clear();
-        std::io::stdin().read_line(&mut line)?;
-        if line.eq("exit\n") {
-            break;
-        }
-        let mut input = lexer::Lexer::new(line.chars(), None);
-        print!("Lexer Input: \n\t {line}\n");
-        print!("Lexer output: \n\t");
-        while let Ok(tok) = input.lex() {
-            print!("{}\n\t", tok);
-        }
-        print!("\n> ");
-    }
-    Ok(())
+    unimplemented!();
+//    println!("interpret");
+//    let mut evaluator = Evaluator::new();
+//    let mut line = String::new();
+//    print!("> ");
+//    loop {
+//        std::io::stdout().flush()?;
+//        line.clear();
+//        std::io::stdin().read_line(&mut line)?;
+//        if line.eq("exit\n") || line.eq("quit\n") {
+//            break;
+//        }
+//        let input: Vec<Token> = lexer::Lexer::init(&line, None).collect();
+//        match def_parser()(&input) {
+//            Ok((_, stmt)) => {
+//                dbg!(&stmt);
+//                let eval = evaluator.eval_stmt(stmt);
+//                println!("{eval}");
+//            }
+//            Err((_, err)) => println!("{err:#?}"),
+//        };
+//        print!("\n> ");
+//    }
+//    Ok(())
 }
 
 fn check() -> std::io::Result<()> {
@@ -60,5 +64,8 @@ fn check() -> std::io::Result<()> {
 }
 
 fn build() -> std::io::Result<()> {
+    unimplemented!()
+}
+fn run() -> std::io::Result<()> {
     unimplemented!()
 }

@@ -1,74 +1,79 @@
 {
+  description = "A language to rule them all.";
+
   inputs = {
-    nixCargoIntegration.url = "github:yusdacra/nix-cargo-integration";
+    nixpkgs.url = "github:nixos/nixpkgs/nixpkgs-unstable";
+    flake-utils= {
+      url = "github:numtide/flake-utils";
+    };
+
+    crane = {
+      url = "github:ipetkov/crane";
+      inputs.nixpkgs.follows = "nixpkgs";
+    };
+     
+    fenix = {
+      url = "github:nix-community/fenix";
+      inputs.nixpkgs.follows = "nixpkgs";
+      inputs.rust-analyzer-src.follows = "";
+    };
   };
 
-  outputs = inputs:
-    inputs.nixCargoIntegration.lib.makeOutputs {
-      root = ./.;
-      # Which dream2nix builder to use.
-      # Usually you don't need mess with this.
-      # The default is "crane".
-      builder = "crane";
-      # Change the systems to generate outputs for.
-      # systems = ["x86_64-linux"];
-      # Which package outputs to rename to what.
-      # This renames both their package names and the generated output names.
-      # Applies to generated apps too.
-      renameOutputs = {};
-      # Default outputs to set.
-      defaultOutputs = {
-        # Set the `defaultPackage` output to the "example` package from `packages`.
-        # package = "example";
-        # Set the `defaultApp` output to the "example` app from `apps`.
-        # app = "example";
-      };
-      # Overlays to use for the nixpkgs package set.
-      pkgsOverlays = [];
-      # Overrides provided here will apply to *every crate*,
-      # for *every system*. To selectively override per crate,
-      # one can use `common.cargoPkg.name` attribute. To selectively
-      # override per system one can use `common.system` attribute.
-      overrides = {
-        # Override crate overrides.
-        #
-        # The environment variables and build inputs specified here will
-        # also get exported in the development shell.
-        crates = common: prev: {
-          # test = old: {
-          #   buildInputs = (old.buildInputs or []) ++ [ common.pkgs.hello ];
-          #   TEST_ENV = "test";
-          # }
-        };
-        # Development shell overrides.
-        shell = common: prev: {
-          # Packages to be put in $PATH.
-          packages = prev.packages ++ [
-              common.pkgs.rust-analyzer
-              common.pkgs.cargo-watch
-          ];
-          # Commands that will be shown in the `menu`. These also get added
-          # to packages.
-          commands =
-            prev.commands
-            ++ [
-              # { package = common.pkgs.git; }
-              # { name = "helloworld"; command = "echo 'Hello world'"; }
-            ];
-          # Environment variables to be exported.
-          env =
-            prev.env
-            ++ [
-              # lib.nameValuePair "PROTOC" "protoc"
-              # { name = "HOME_DIR"; eval = "$HOME"; }
-            ];
-        };
-        # Override the build configuration.
-        # This corresponds to `dream2nix`'s `makeFlakeOutputs` arguments.
-        build = common: prev: {
-          # for example, set the translator to something else
-          # settings = (prev.settings or []) ++ [{translator = "cargo-toml";}];
-        };
-      };
+  outputs = {self, nixpkgs, flake-utils, crane, fenix}:
+  flake-utils.lib.eachDefaultSystem (system:
+  let
+    pkgs = import nixpkgs { inherit system; };
+    # Rust setup.
+    fenixPkgs = fenix.packages.${system};
+    rust-toolchain = fenixPkgs.stable.toolchain;
+    rust-env = [rust-toolchain] ++ (with pkgs; [
+      rust-analyzer
+      cargo-watch
+      cargo-expand
+    ]);
+
+    # Crane setup.
+    craneLib = (crane.mkLib pkgs).overrideToolchain rust-toolchain;
+    # Source.
+    src = craneLib.cleanCargoSource (craneLib.path ./.);
+    commonArgs = {
+      inherit src;
+      buildInputs = [];
     };
+    # Deps.
+    cargoArtifacts = craneLib.buildDepsOnly commonArgs;
+
+
+    my-crate = craneLib.buildPackage(commonArgs // {
+        inherit cargoArtifacts;
+    });
+
+  in {
+    checks = {
+      inherit my-crate;
+    
+      rust_fmt = craneLib.cargoFmt {
+        inherit src;
+      };
+
+      rust_doc = craneLib.cargoDoc (commonArgs // {
+          inherit cargoArtifacts;
+      }); 
+
+      rust_test = craneLib.cargoNextest (commonArgs // {
+          inherit cargoArtifacts;
+          partitions = 1;
+          partitionType = "count";
+      });
+    };
+
+    apps.default = flake-utils.lib.mkApp {
+        drv = my-crate;
+    };
+
+    devShells.default = pkgs.mkShell {
+      nativeBuildInputs = rust-env;
+    };
+    formatter = pkgs.nixpkgs-fmt;
+  });
 }

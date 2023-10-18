@@ -8,11 +8,10 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-err-derive = "0.3.1"
-clap = {version = "3.2.2", features = ["derive"]}
+# Internal deps
+# shade_utils = {}
 
-[package.metadata.nix]
-# Toggle app flake output
-app = true
-# Toggle flake outputs that build (checks, package and app)
-build = true
+# External deps 
+thiserror = "1.0.49"
+clap = { version = "4.4.4", features = ["derive"] }
+phf = { version = "0.11.2", features = ["macros"] }

@@ -1,6 +1,6 @@
-use std::collections::HashMap;
+use std::{collections::HashMap, fmt::Display};
 
-use super::{Expr, Ident};
+use super::{Ident, Expr};
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum Value {
@@ -8,7 +8,28 @@ pub enum Value {
     Float(f32),
     Unit(()),
     List(Vec<Value>),
-    Function(Option<Ident>, Box<Expr>),
+    Fn {arg: Ident, expr: Box<Expr>},
+}
+
+impl Display for Value {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        use Value::*;
+        match self {
+            Int(v) => write!(f, "{v}"),
+            Float(v) => write!(f, "{v}"),
+            Unit(v) => write!(f, ""),
+            List(v) => {
+                write!(f, "[ ")?;
+                for v in v.iter() {
+                    write!(f, "{v}")?;
+                }
+                write!(f, " ]")
+            }
+            Fn { arg, expr } => {
+                write!(f, "{arg} -> {expr}")
+            }
+        }
+    }
 }
 
 impl Value {
@@ -76,7 +97,6 @@ impl Value {
             Float(v) => Float(*v),
             Unit(_) => Unit(()),
             List(v) => List(v.to_vec()),
-            Function(ident, expr) => expr.eval(context),
         }
     }
 }

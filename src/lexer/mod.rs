@@ -1,256 +1,233 @@
-use std::{iter::Peekable, str::Chars};
+use crate::utils::*;
 
-use err_derive::Error;
+mod input;
+pub mod token;
+use thiserror::Error;
+use token::*;
 
-mod token;
-pub use token::*;
+use input::Cursor;
+
+pub type TkHandle = usize;
 
 #[derive(Debug, Error)]
 pub enum LexError {
-    #[error(display = "Unrecognized token at {}: {}", _0, _1)]
-    UnrecognizedToken(Loc, Token),
-    #[error(display = "End of input reached.")]
-    EOIReached,
+    #[error("Unbalanced delims.")]
+    UnbalancedDelimiter(Loc),
+}
+pub type Result<T> = std::result::Result<T, (LexedBuffer, LexError)>;
+
+/// Output of the lexing stage.
+#[derive(Debug)]
+pub struct LexedBuffer {
+    kinds: IVec<TkKind>,
+    spans: IVec<Span>,
 }
 
+impl LexedBuffer {
+    pub fn nb_tokens(&self) -> usize {
+        self.kinds.len()
+    }
+
+    pub fn next_handle(&self, handle: TkHandle) -> Option<TkHandle> {
+        if handle >= self.kinds.len() {
+            return None;
+        } 
+        Some(handle + 1)
+    }
+
+    pub fn first(&self) -> Option<TkHandle> {
+        if self.kinds.len() == 0 {
+            None
+        } else {
+            Some(0usize)
+        }
+    }
+
+    pub fn get_kind(&self, id: TkHandle) -> &TkKind {
+        &self.kinds[id]
+    }
+
+    pub fn get_token_txt(&self, id: TkHandle, input: IStr) -> IStr {
+        let span = self.spans[id];
+        input[span.to_range()].into()
+    }
+}
+
+/// Lexing state. Call new with an input to create, and lex to lex the input.
 #[derive(Debug)]
 pub struct Lexer<'a> {
-    file_path: Option<String>,
-    input: Peekable<Chars<'a>>,
-    row: usize,
-    col: usize,
-    ended: bool,
+    cursor: Cursor<'a>,
+    tokens: Vec<TkKind>,
+    spans: Vec<Span>,
+    start: Loc,
 }
 
 impl<'a> Lexer<'a> {
-    pub fn new(chars: Chars<'a>, file_path: Option<String>) -> Self {
+    pub fn new(input: &'a str) -> Lexer<'a> {
+        let cursor = Cursor::new(input);
+        let start = cursor.loc();
         Self {
-            input: chars.peekable(),
-            file_path,
-            row: 0usize,
-            col: 0usize,
-            ended: false,
+            cursor,
+            tokens: vec![],
+            spans: vec![],
+            start,
         }
     }
 
-    pub fn loc(&self) -> Loc {
-        Loc {
-            file_path: self.file_path.clone(),
-            row: self.row,
-            col: self.col,
+    pub fn lex(mut self) -> Result<LexedBuffer> {
+        self.trim_whitespaces();
+        while let Some(c) = self.cursor.next() {
+            match c {
+                ':' => self.push_token(TkKind::Colon)?,
+                '=' => self.push_token(TkKind::Equals)?,
+                '(' => self.push_token(TkKind::Lpar)?,
+                ')' => self.push_token(TkKind::Rpar)?,
+                '@' => self.push_token(TkKind::At)?,
+                '-' => self.resolve_comment()?,
+                '_' => self.lex_identifier(),
+                _ if c.is_alphabetic() || c == '_' => self.lex_ident_or_keyword(c),
+                '0' if self.cursor.next_if(|c| *c == 'b').is_some() => self.lex_bin_int(),
+                '0' if self.cursor.next_if(|c| *c == 'x').is_some() => self.lex_hex_int(),
+                _ if c.is_numeric() => self.lex_float_or_int(),
+                _ => self.push_token(TkKind::Unrecognized)?,
+            };
+            self.trim_whitespaces();
         }
+        Ok(self.finalize())
+    }
+
+    fn finalize(self) -> LexedBuffer {
+        LexedBuffer {
+            kinds: self.tokens.into(),
+            spans: self.spans.into(),
+        }
+    }
+
+    fn push_token(&mut self, kind: TkKind) -> Result<()> {
+        self.tokens.push(kind);
+        // TODO Handle balanced delimiters.
+        self.spans.push(self.cursor.span(self.start));
+        self.start = self.cursor.loc();
+        Ok(())
     }
 
     fn trim_whitespaces(&mut self) {
-        while let Some(_) = self.input.next_if(|c| match c {
-            _ if c.is_whitespace() && *c != '\n' => {
-                self.col += 1;
-                true
-            }
-            '\n' => {
-                self.col = 0;
-                self.row += 1;
-                true
-            }
-            _ => false,
-        }) {}
+        while let Some(_) = self.cursor.next_if(|c| c.is_whitespace()) {}
     }
 
-    fn advance(&mut self) -> Option<char> {
-        self.col += 1;
-        self.input.next()
+    fn lex_identifier(&mut self) {
+        self.cursor.skip_while(pred::ident_char);
+        self.push_token(TkKind::Ident).unwrap()
     }
 
-    fn advance_if(&mut self, f: impl FnOnce(&char) -> bool) -> Option<char> {
-        let output = self.input.next_if(f);
-        if output.is_some() {
-            self.col += 1;
+    fn lex_ident_or_keyword(&mut self, c: char) {
+        let mut kw = String::from(c);
+        while let Some(c) = self.cursor.next_if(pred::ident_char) {
+            kw.push(c);
         }
-        output
-    }
-
-    pub fn lex(&mut self) -> Result<Token, LexError> {
-        if self.ended {
-            return Err(LexError::EOIReached);
-        }
-        self.trim_whitespaces();
-        let loc = self.loc();
-        if let Some(c) = self.advance() {
-            let mut text = c.to_string();
-            match c {
-                ':' => Ok(Token {
-                    text,
-                    kind: TokenKind::Colon,
-                    loc,
-                }),
-                ',' => Ok(Token {
-                    text,
-                    kind: TokenKind::Comma,
-                    loc,
-                }),
-                '+' => Ok(Token {
-                    text,
-                    loc,
-                    kind: TokenKind::Plus,
-                }),
-                '-' => Ok(Token {
-                    text,
-                    loc,
-                    kind: TokenKind::Dash,
-                }),
-                '*' => Ok(Token {
-                    text,
-                    loc,
-                    kind: TokenKind::Star,
-                }),
-                '/' => Ok(Token {
-                    text,
-                    loc,
-                    kind: TokenKind::Slash,
-                }),
-                '%' => Ok(Token {
-                    text,
-                    loc,
-                    kind: TokenKind::Percent,
-                }),
-                '!' => Ok(Token {
-                    text,
-                    loc,
-                    kind: TokenKind::Bang,
-                }),
-                '|' => Ok(Token {
-                    text,
-                    loc,
-                    kind: TokenKind::Bar,
-                }),
-                '(' => Ok(Token {
-                    text,
-                    loc,
-                    kind: TokenKind::Lpar,
-                }),
-                ')' => Ok(Token {
-                    text,
-                    loc,
-                    kind: TokenKind::Rpar,
-                }),
-                '[' => Ok(Token {
-                    text,
-                    loc,
-                    kind: TokenKind::LBracket,
-                }),
-                ']' => Ok(Token {
-                    text,
-                    loc,
-                    kind: TokenKind::RBracket,
-                }),
-                '{' => Ok(Token {
-                    text,
-                    loc,
-                    kind: TokenKind::LBrace,
-                }),
-                '}' => Ok(Token {
-                    text,
-                    loc,
-                    kind: TokenKind::RBrace,
-                }),
-                '<' => Ok(Token {
-                    text,
-                    loc,
-                    kind: TokenKind::LT,
-                }),
-                '>' => Ok(Token {
-                    text,
-                    loc,
-                    kind: TokenKind::GT,
-                }),
-                _ if c.is_alphabetic() || c == '_' => {
-                    while let Some(x) = self.advance_if(is_ident_char) {
-                        text.push(x);
-                    }
-                    Ok(Token {
-                        text,
-                        loc,
-                        kind: TokenKind::Ident,
-                    })
-                }
-                '0' if self.advance_if(|c| *c == 'x').is_some() => {
-                    text.push('x');
-                    while let Some(c) = self.advance_if(is_hexa_int_char) {
-                        text.push(c)
-                    }
-                    Ok(Token {
-                        text,
-                        loc,
-                        kind: TokenKind::Int,
-                    })
-                }
-                '0' if self.advance_if(|c| *c == 'b').is_some() => {
-                    text.push('b');
-                    while let Some(c) = self.advance_if(is_bin_int_char) {
-                        text.push(c)
-                    }
-                    Ok(Token {
-                        text,
-                        loc,
-                        kind: TokenKind::Int,
-                    })
-                }
-                _ if c.is_numeric() => {
-                    let mut kind = TokenKind::Int;
-                    while let Some(x) = self.advance_if(is_number_char) {
-                        text.push(x);
-                        if "eE.".contains(x) {
-                            kind = TokenKind::Float;
-                            if let Some(v) = self.advance_if(|c| "-+".contains(*c) && x != '.') {
-                                text.push(v);
-                            }
-                        };
-                    }
-                    Ok(Token { kind, text, loc })
-                }
-                _ => {
-                    let unexpected = Token {
-                        text,
-                        loc: loc.clone(),
-                        kind: TokenKind::Unrecognized,
-                    };
-                    return Err(LexError::UnrecognizedToken(loc, unexpected));
-                }
-            }
+        if let Some(kw) = KEYWORD_MAP.get(&kw) {
+            self.push_token(TkKind::KeyWord(*kw)).unwrap()
         } else {
-            self.col += 1;
-            let eoitok = Token {
-                kind: TokenKind::EOI,
-                loc: self.loc(),
-                text: String::default(),
-            };
-            self.ended = true;
-            Ok(eoitok)
+            self.push_token(TkKind::Ident).unwrap()
         }
+    }
+
+    fn lex_float_or_int(&mut self) {
+        let mut is_float = false;
+        while let Some(x) = self.cursor.next_if(pred::number_char) {
+            if "eE.".contains(x) {
+                is_float = true;
+                self.cursor.skip_if(|c| "-+".contains(*c) && x != '.');
+            };
+        }
+        self.push_token(TkKind::Litteral);
+    }
+
+    fn lex_bin_int(&mut self) {
+        self.cursor.skip_while(pred::bin_int_char);
+        self.push_token(TkKind::Litteral);
+    }
+
+    fn lex_hex_int(&mut self) {
+        self.cursor.skip_while(pred::bin_int_char);
+        self.push_token(TkKind::Litteral);
+    }
+
+    fn resolve_comment(&mut self) -> Result<()> {
+        match self.cursor.peek_char() {
+            Some('-') => {
+                // a single line comment '--'
+                self.cursor.skip_while(|c| *c != '\n');
+                self.push_token(TkKind::Comment).unwrap();
+            }
+            Some('{') => loop {
+                // Multiline comment '-{ ... }-'.
+                self.cursor.skip_while(|c| *c != '}');
+                if let Some('-') = self.cursor.peek_char() {
+                    self.cursor.next();
+                    self.push_token(TkKind::Comment);
+                    break;
+                }
+            },
+            _ => self.push_token(TkKind::Unrecognized)?,
+        }
+        Ok(())
     }
 }
 
-fn is_ident_char(x: &char) -> bool {
-    x.is_alphanumeric() || *x == '_'
+mod pred {
+    pub fn ident_char(x: &char) -> bool {
+        x.is_alphanumeric() || *x == '_'
+    }
+
+    pub fn number_char(x: &char) -> bool {
+        let chars = "eE.";
+        x.is_ascii_digit() || chars.contains(*x)
+    }
+
+    pub fn hexa_int_char(x: &char) -> bool {
+        x.is_ascii_digit() || "aAbBcCdDeEfF".contains(*x)
+    }
+
+    pub fn bin_int_char(x: &char) -> bool {
+        "01".contains(*x)
+    }
 }
 
-fn is_number_char(x: &char) -> bool {
-    let chars = "eE.";
-    x.is_ascii_digit() || chars.contains(*x)
-}
+#[cfg(test)]
+mod test {
+    use super::*;
 
-fn is_hexa_int_char(x: &char) -> bool {
-    x.is_ascii_digit() || "aAbBcCdDeEfF".contains(*x)
-}
+    fn match_kinds(found: IVec<TkKind>, expected: Vec<TkKind>) -> bool {
+        for (found, expected) in found.iter().zip(expected.iter()) {
+            if found != expected {
+                return false;
+            }
+        }
+        return true;
+    }
 
-fn is_bin_int_char(x: &char) -> bool {
-    *x == '0' || *x == '1'
-}
-
-impl<'a> Iterator for Lexer<'a> {
-    type Item = Token;
-
-    fn next(&mut self) -> Option<Self::Item> {
-        self.lex().ok()
+    #[test]
+    fn test_basic_lexing() {
+        let input: IStr = "comp = f: g: x: f (g x)".into();
+        let lexed = Lexer::new(&input).lex().unwrap();
+        match_kinds(
+            lexed.kinds,
+            vec![
+                TkKind::Ident, // comp
+                TkKind::Equals,// =
+                TkKind::Ident, // f
+                TkKind::Colon, // :
+                TkKind::Ident, // g
+                TkKind::Colon, // :
+                TkKind::Ident, // x
+                TkKind::Colon, // :
+                TkKind::Ident, // f
+                TkKind::Lpar,  // (
+                TkKind::Ident, // g
+                TkKind::Ident, // x
+                TkKind::Rpar,  // )
+            ],
+        );
     }
 }
