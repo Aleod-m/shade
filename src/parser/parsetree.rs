@@ -1,13 +1,14 @@
 use std::fmt::Display;
 
-use crate::lexer;
-
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum NodeKind {
     // Function Declaraiton
     FnDecl,
     FnArg,
 
+    // Assign
+    Assign,
+    LAssign,
 
     // Expresssions.
     FnApp, // Function Application
@@ -29,6 +30,8 @@ impl Display for NodeKind {
             NodeKind::FnDecl => write!(f, "Function Declaration"),
             NodeKind::FnArg => write!(f, "Function Argument"),
             NodeKind::IdentValue => write!(f, "Ident as value"),
+            NodeKind::Assign => write!(f, "Assign statement"),
+            NodeKind::LAssign => write!(f, "Left side of the assignement"),
         }
     }
 }

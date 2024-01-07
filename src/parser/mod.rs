@@ -4,6 +4,8 @@ mod internals;
 pub mod parsetree;
 pub use internals::*;
 use thiserror::Error;
+mod grammar;
+
 
 
 #[derive(Error, Debug)]
@@ -12,71 +14,12 @@ pub enum ParseError {
     NONE,
 }
 
-use parsetree::NodeKind;
-use crate::lexer::token::TkKind;
-
-use ParserRes::*;
-
-mk_parsers! {
-    input = parsed;
-    /// The most basic parser that parses a single token:
-    /// - Succed if the next token in the input is of `kind`.
-    /// - Fails otherwise.
-    pub token(kind : TkKind) = (expr : if parsed.is_kind(kind) {
-            Succ
-        } else {
-            Fail
-        }
-    );
-
-    pub basic(tk: TkKind, node: NodeKind) = (seq:
-        token(tk) => { push node }
-    );
-
-    /// A parser that tries to parse an specific keyword.
-    //pub keyword(kw: KeyWord) = ( expr: Fail );
-
-    pub expr() = (choice:
-        ; atom(expr())
-        ; fn_app()
-        ; function()
-        ; basic(TkKind::Ident, NodeKind::IdentValue)
-    );
-
-
-    pub atom(p: impl Parser) = (seq:
-        token(TkKind::Lpar) => { stack NodeKind::AtomBegin }
-        p => {}
-        token(TkKind::Rpar) => { stack NodeKind::AtomEnd }
-        ; after { pop; pop }
-    );
-
-    pub fn_app() = (seq:
-        fn_app_left() => { stack NodeKind::FnApp }
-        expr() => { }
-        ; after { pop }
-    );
-
-    pub fn_app_left() = (choice:
-        ; atom(function())
-        ; basic(TkKind::Ident, NodeKind::IdentValue)
-    );
-
-
-    pub function() = (seq:
-        token(TkKind::Ident) => { push NodeKind::FnArg }
-        token(TkKind::Colon) => { stack NodeKind::FnDecl }
-        expr() => { }
-        ; after  { pop }
-    )
-}
-
 #[cfg(test)]
 mod test {
     use crate::{lexer::Lexer, utils::IStr};
 
-    use super::{state::*, *};
-    use NodeKind::*;
+    use super::{state::*, grammar::*, *};
+    use parsetree::NodeKind::{self, *};
 
     fn verify_nodes<'a>(pb: ParsedBuffer, expected: Vec<NodeKind>) {
         for (&e_kind, &f_kind) in expected.iter().zip(pb.nodes().iter()) {
@@ -88,6 +31,24 @@ mod test {
         let input: IStr = input.into();
         ParserState::new(Lexer::new(&input.clone()).lex().unwrap())
     }
+
+    macro_rules! mk_test {
+        ($name:ident, $input:literal, $parser:expr, $expected:tt) => {
+            #[test]
+            fn $name() {
+                let pb = new_state($input).run_parser($parser);
+                verify_nodes(pb, vec!$expected)
+            }
+        };
+    }
+
+    mk_test!(test_assign, "a = x: x", assign(), [
+        Assign, // = 
+        LAssign, // a
+        FnDecl, // :
+        FnArg, // x
+        IdentValue, // x
+    ]);
 
     #[test]
     fn test_basic_parser() {

@@ -2,9 +2,10 @@ use std::fmt::Debug;
 
 use thiserror::Error;
 
-use crate::{lexer::{LexedBuffer, self, TkHandle, token::TkKind}, ast::{self, NodeKind, NodeHandle}, utils::IVec};
+use crate::{lexer::{LexedBuffer, self, TkHandle, token::TkKind}, utils::IVec};
 
 use super::Parser;
+use crate::parser::parsetree::NodeKind;
 
 #[derive(Error, Debug)]
 pub enum StateError
@@ -24,9 +25,9 @@ pub enum StateError
 pub struct ParserState {
     input: LexedBuffer,
     tk_handle: Option<TkHandle>,
-    kinds: Vec<ast::NodeKind>,
+    kinds: Vec<NodeKind>,
     tks: Vec<TkHandle>,
-    stack: Vec<(ast::NodeKind, TkHandle)>,
+    stack: Vec<(NodeKind, TkHandle)>,
     errors: Vec<StateError>,
 }
 

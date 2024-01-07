@@ -1,5 +1,3 @@
-#[macro_use]
-pub mod combinator;
 pub mod state;
 
 #[derive(Debug)]
@@ -21,7 +19,11 @@ where
 macro_rules! mk_parsers {
     (
     input = $input:ident;
-    $($(#[doc= $doc:expr])*$v:vis $name:ident($($param:ident : $pty:ty),*) = $rule:tt);+
+    $(
+        $(#[doc= $doc:expr])*
+        $v:vis $name:ident ( $($param:ident : $pty:ty),* ) = $rule:tt
+    );+ 
+    $(;)?
     ) => {
         $(
             $(#[doc = $doc])*
@@ -29,7 +31,7 @@ macro_rules! mk_parsers {
                 #[allow(unused_mut)]
                 move |mut $input: &mut crate::parser::internals::state::ParserState| {
                     let state = $input.save();
-                    mk_rule!($input, $rule, state)
+                    mk_rule!($input, state, $rule)
                 }
                 
             }
@@ -38,59 +40,101 @@ macro_rules! mk_parsers {
 }
 
 macro_rules! mk_rule {
+    // Simple rule.
     (
         $in:ident,
-        ( seq:
-            $($p:expr => { $($op:ident $($val:expr)?);* })*
-            $(; after { $($op_:ident $($val_:expr)?);* })?
-        )
-        , $state:ident
+        $state:ident,
+        { just $j_content:tt $(then $t_content:tt)? }
     ) => { {
-        $(
-            match $p($in) {
-                crate::parser::ParserRes::Succ => { $(mk_seq!($in, $op $($val)?));* },
-                f @ crate::parser::ParserRes::Fail => {
-                    $in.restore($state);
-                    return f;
-                }
-            }
-        )*
-        $(
-            $(mk_seq!($in, $op_ $($val_)?));*;
-        )?
-            return crate::parser::ParserRes::Succ; 
+        mk_just!($in, $state, $j_content)
     } };
+
+    // Sequence rule.
     (
         $in:ident,
-        (choice:
-            $(; $p:expr)*
-        )
-        , $state:ident
-    ) => { {
-        $(
-            if let crate::parser::ParserRes::Succ = $p($in) {
-                return crate::parser::ParserRes::Succ; 
-            }
-        )*
-            $in.restore($state);
-            return crate::parser::ParserRes::Fail; 
-        } };
-    (
-        $in:ident,
-        (expr :
-            $p:expr
-        )
-        , $state:ident
-    ) => { {
-        let res = $p;
-        if let crate::parser::ParserRes::Fail = res {
-            $in.restore($state);
+        $state:ident,
+        { 
+            seq $s_content:tt
+            $(then $ops:tt)?
         }
-        res
-    } }
+    ) => { {
+        mk_seq!($in, $state, $s_content);
+        $( mk_ops!($in, $ops); )?
+        return crate::parser::ParserRes::Succ;
+    } };
+    // Choice rule.
+    (
+        $in:ident,
+        $state:ident,
+        {
+            choice $c_content:tt
+            $( then $ops:tt )?
+        }
+    ) => { {
+        mk_choice!($in, $c_content);
+        $( mk_ops!($in, $ops); )?
+        $in.restore($state);
+        return crate::parser::ParserRes::Fail;
+    } };
+    // Expresion rule.
+    (
+        $in:ident,
+        $state:ident,
+        {
+            $expr:expr
+        }
+    ) => { { 
+        let res = $expr;
+        match res {
+            f @ crate::parser::ParserRes::Succ => f,
+            f @ crate::parser::ParserRes::Fail => {
+                $in.restore($state);
+                f
+            }
+       }
+    } };
 }
 
+macro_rules! mk_just {
+    ($in:ident, $state:ident, { $p:expr => $($op:tt)? }) => { {
+            let crate::parser::ParserRes::Succ = $p($in) else {
+                $in.restore($state);
+                return crate::parser::ParserRes::Fail;
+            };
+            $(mk_ops!($in, $op);)?
+            return crate::parser::ParserRes::Succ;
+    } }
+}
 macro_rules! mk_seq {
+    ($in:ident, $state:ident, { $($p:expr $(=> $op:tt)?),* $(,)? }) => { {
+        $(
+            let crate::parser::ParserRes::Succ = $p($in) else {
+                    $in.restore($state);
+                    return crate::parser::ParserRes::Fail;
+            };
+            $(mk_ops!($in, $op);)?
+        )*
+    } };
+}
+macro_rules! mk_choice {
+    ($in:ident, { $($p:expr $(=> $op:tt)?),* $(,)? }) => { {
+        $(
+            if let res @ crate::parser::ParserRes::Succ = $p($in) {
+                return res;
+            }
+            $(mk_ops!($in, $op);)?
+        )*
+    } };
+}
+
+macro_rules! mk_ops {
+    ($in: ident, ()) => { };
+    ($in: ident, { $($op:ident $($val:expr)?);*}) => { 
+        $(mk_op!($in, $op $($val)?);)*
+    };
+}
+
+macro_rules! mk_op {
     ($in: ident, push $val:expr) => {
         $in.push_node($val)
     };
