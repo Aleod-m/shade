@@ -1,4 +1,3 @@
-pub mod ast;
 pub mod parser;
 pub mod lexer;
 //pub mod types;
@@ -28,7 +27,31 @@ mod utils {
             Self { start, end }
         }
 
-        pub(crate) fn to_range(&self) -> Range<usize> {
+        pub fn is_overlaping(&self, other: Self) -> bool {
+            self.start.pos < other.end.pos && self.start.pos > other.start.pos
+            || 
+            self.end.pos < other.end.pos && self.end.pos > other.start.pos
+        }
+
+        pub fn around(a: Self, b: Self) -> Self {
+            let start = if a.start.pos < b.start.pos { a } else { b }.start;
+            let end = if a.end.pos < b.end.pos { b } else { a }.end;
+            Self::new(start, end)
+        }
+
+        pub fn inside(a: Self, b: Self) -> Option<Self> {
+            if a.is_overlaping(b) {
+                return None;
+            } else {
+                let start = if a.end.pos < b.end.pos { a } else { b }.end;
+                let end = if a.start.pos < b.start.pos { b } else { a }.start;
+                Some(Self::new(start, end))
+            }
+        }
+    }
+
+    impl Into<Range<usize>> for Span {
+        fn into(self) -> Range<usize> {
             self.start.pos..self.end.pos
         }
     }

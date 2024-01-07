@@ -49,7 +49,8 @@ impl LexedBuffer {
 
     pub fn get_token_txt(&self, id: TkHandle, input: IStr) -> IStr {
         let span = self.spans[id];
-        input[span.to_range()].into()
+        let range: std::ops::Range<_> = span.into();
+        input[range].into()
     }
 }
 
