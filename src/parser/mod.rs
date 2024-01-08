@@ -50,51 +50,41 @@ mod test {
         IdentValue, // x
     ]);
 
-    #[test]
-    fn test_basic_parser() {
-        let pb = new_state("(f: f) a").run_parser(expr());
-        let expected = vec![
+    mk_test!(test_fn_app, "(f: f) a", expr(), [
+        IdentValue, // f
+        FnArg, // f
+        FnDecl, // :
+        AtomEnd, //)
+        AtomBegin, //(
+        
+        IdentValue, // a
 
-            IdentValue, // f
-            FnArg, // f
-            FnDecl, // :
-            AtomEnd, //)
-            AtomBegin, //(
-            
-            IdentValue, // a
+        FnApp, // ?
+    ]);
 
-            FnApp, // ?
-        ];
-        verify_nodes(pb, expected)
-    }
+    mk_test!(test_fn_app_2, "(f: g: f g) (x: x) a", expr(), [
+        IdentValue, // g
+        IdentValue, // f
+        FnApp, // ?
+        
+        FnArg, // g
+        FnDecl, //:
+        FnArg, // f
+        FnDecl, // :
+        AtomEnd, //)
+        AtomBegin, //(
 
-    #[test]
-    fn test_2_fn_app_parser() {
-        let pb = new_state("(f: g: f g) (x: x) a").run_parser(expr());
-        let expected = vec![
-            IdentValue, // g
-            IdentValue, // f
-            FnApp, // ?
-            
-            FnArg, // g
-            FnDecl, //:
-            FnArg, // f
-            FnDecl, // :
-            AtomEnd, //)
-            AtomBegin, //(
+        IdentValue, // x
+        FnArg, // x
+        FnDecl, // :
+        AtomEnd, //)
+        AtomBegin, //(
 
-            IdentValue, // x
-            FnArg, // x
-            FnDecl, // :
-            AtomEnd, //)
-            AtomBegin, //(
+        FnApp, // ?
 
-            FnApp, // ?
+        IdentValue, // a
+        
+        FnApp, // ?
+    ]);
 
-            IdentValue, // a
-            
-            FnApp, // ?
-        ];
-        verify_nodes(pb, expected)
-    }
 }
