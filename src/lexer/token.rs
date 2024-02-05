@@ -3,22 +3,31 @@ use std::fmt;
 use crate::utils::*;
 
 use phf::phf_map;
+pub use TkKind::*;
+pub use Kw::*;
+pub use Lit::*;
 
 #[derive(Debug, PartialEq, Clone, Copy)]
 pub enum TkKind {
-    KeyWord(KeyWord),
-    Ident, // "_"? ASCII_ALPHA*
-    Colon, // :
-    Equals, // =
-
-    Lpar, // (
-    Rpar, // )
-    
-    At,     // @
-    Dollar, // $
-
-    // Litterals
-    Litteral,
+    KeyWord(Kw),
+    Ident,    // "_"? ASCII_ALPHA*
+    Colon,    // :
+    Equals,   // =
+    Comma,    // ,
+    At,       // @
+    Dollar,   // $
+    Dash,     // -
+    GT,       // >
+    LT,       // <
+    Dot,      // .
+    Lpar,     // (
+    Rpar,     // )
+    Lbrace,   // {
+    Rbrace,   // }
+    Lbracket, // [
+    Rbracket, // ]
+    Bar,      // |
+    Litteral(Lit), // litteral
 
     // Unimportant Tokens
     Comment,      // A comment.
@@ -28,14 +37,14 @@ pub enum TkKind {
 impl TkKind {
     pub fn is_close_delim(&self) -> bool {
         match self {
-            Self::Rpar => true,
+            Self::Rpar | Self::Rbracket | Self::Rbrace => true,
             _ => false,
         }
     }
 
     pub fn is_open_delim(&self) -> bool {
         match self {
-            Self::Lpar => true,
+            Self::Lpar | Self::Lbracket | Self::Rbrace => true,
             _ => false,
         }
     }
@@ -44,6 +53,11 @@ impl TkKind {
         match self {
             Self::Rpar => Self::Lpar,
             Self::Lpar => Self::Rpar,
+            Self::Rbrace => Self::Lbrace,
+            Self::Lbrace => Self::Rbrace,
+            Self::Rbracket => Self::Lbracket,
+            Self::Lbracket => Self::Rbracket,
+            Self::Bar => Self::Bar,
             _ => unreachable!("Caled get_matching_delim on a token that wasn't a delimiter.")
         }
     }
@@ -53,23 +67,33 @@ impl fmt::Display for TkKind {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         use TkKind::*;
         match self {
-            Colon => write!(f, ":"),
-            Lpar => write!(f, ")"),
-            Rpar => write!(f, "("),
-            At => write!(f, "@"),
-            Dollar => write!(f, "$"),
-            Equals => write!(f, "="),
-            Ident => write!(f, "identifier"),
-            Litteral => write!(f, "literal"),
-            KeyWord(kw) => write!(f, "keyword: {kw}"),
-            Comment => write!(f, "comment"),
-            Unrecognized => write!(f, "unrecognized"),
+            Colon    => write!(f, ":"),
+            Dash     => write!(f, "-"),
+            LT       => write!(f, "<"),
+            GT       => write!(f, ">"),
+            Lpar     => write!(f, ")"),
+            Rpar     => write!(f, "("),
+            At       => write!(f, "@"),
+            Dollar   => write!(f, "$"),
+            Equals   => write!(f, "="),
+            Lbrace   => write!(f, "{{"),
+            Rbrace   => write!(f, "}}"),
+            Lbracket => write!(f, "["),
+            Rbracket => write!(f, "]"),
+            Comma    => write!(f, ","),
+            Dot      => write!(f, "."),
+            Bar      => write!(f, "|"),
+            Ident         => write!(f, "identifier"),
+            Litteral(lit) => write!(f, "Lit({lit})"),
+            KeyWord(kw)   => write!(f, "Kw({kw})"),
+            Comment       => write!(f, "comment"),
+            Unrecognized  => write!(f, "unrecognized"),
         }
     }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub enum KeyWord {
+pub enum Kw {
     // If Control flow.
     If,
     Then,
@@ -84,43 +108,44 @@ pub enum KeyWord {
     In,
 }
 
-pub static KEYWORD_MAP: phf::Map<&'static str, KeyWord> = phf_map! {
-    "if" => KeyWord::If,
-    "then" => KeyWord::Then,
-    "else" => KeyWord::Else,
-    "match" => KeyWord::Match,
-    "with" => KeyWord::With,
-    "let" => KeyWord::Let,
-    "in" => KeyWord::In,
+pub static KEYWORD_MAP: phf::Map<&'static str, Kw> = phf_map! {
+    "if" => If,
+    "then" => Then,
+    "else" => Else,
+    "match" => Match,
+    "with" => With,
+    "let" => Let,
+    "in" => In,
 };
 
-impl fmt::Display for KeyWord {
+impl fmt::Display for Kw {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            KeyWord::If => write!(f, "if"),
-            KeyWord::Then => write!(f, "then"),
-            KeyWord::Else => write!(f, "else"),
-            KeyWord::Match => write!(f, "match"),
-            KeyWord::With => write!(f, "with"),
-            KeyWord::Let => write!(f, "let"),
-            KeyWord::In => write!(f, "in"),
+            If => write!(f, "if"),
+            Then => write!(f, "then"),
+            Else => write!(f, "else"),
+            Match => write!(f, "match"),
+            With => write!(f, "with"),
+            Let => write!(f, "let"),
+            In => write!(f, "in"),
         }
     }
 }
 
-#[derive(Debug, PartialEq, Clone)]
-pub enum Litteral {
-    Int(i64),
-    Float(f64),
-    StringLit(IStr),
+#[derive(Debug, PartialEq, Clone, Copy)]
+pub enum Lit {
+    Int,
+    Float,
+    StringLit,
 }
 
-impl fmt::Display for Litteral {
+impl fmt::Display for Lit {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        use Lit::*;
         match self {
-            Litteral::Int(i) => write!(f, "int : {i}"),
-            Litteral::Float(float) => write!(f, "float : {float}"),
-            Litteral::StringLit(s) => write!(f, "string: \"{s}\""),
+            Int => write!(f, "int"),
+            Float => write!(f, "float"),
+            StringLit => write!(f, "string"),
         }
     }
 }

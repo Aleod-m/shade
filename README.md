@@ -1,57 +1,45 @@
-# Shade a functional language for Graphics and more.
+# Shade a functional language for Gpus and Cpus.
 
-Shade is a language i had in mind for a while. I wanted to have a functional language with more than just the language.
-What i saw is that a lot of times i found myself using the same bits of code in a lots of my shaders. So i wanted to write
-a new language that provide a standard library and modules and such.
+Goal of the language provide a single language to program for both the Cpu and Gpus.
 
 ## Rust i choose you.
 
-I went with rust for writing the compiler. I choose it for two reason. It can iterop fearly well with C/C++. And i was playing with
-wgpu at the time which is implemented in Rust. Hence my choice.
+I went with rust for writing the compiler. I choose it for two reason. It can iterop fearly well with C/C++. So i can provide a reasonable abi.
 
 ## Usefull for Graphics but not only.
 
 As i wanted to use shade for creating games i wanted it to not only be used as a shading language but also as a scripting language.
 
-### A shader language
-
-The principal goal of the shading side of the language is to automate the buffer layout creation.
-
-All variable used in the input of the vertex shader will be put in the buffer. All the global varibles will be put in the Uniform buffer.
-
-The api for creating a shader module is not set yet. But a few things are already defined.
-
-As the language doesn't have any reserved keywords the user will be required to specify theentry points.
-
-### A scripting language
-
-The scripting part of the language is fairly classic.
-
-All the types declared in the script will be a component in an ecs system of your choice.
-Or will need to be provided to the functions. All the functions will be systems.
-
-
 ## Road Map
-
-- [ ] Full syntax.
-    - [x] Functions.
-    - [x] Type declartions.
-    - [ ] Higher order types.
+- [ ] Utils
+    - [ ] Span
+        - [x] Impl.
+        - [x] Get input text.
+        - [ ] Print input Localisation.
+    - [ ] Input adapter.
+        - [x] Adapt Peekable.
+        - [ ] Rewrite Peekable to allow arbitrary lookahead length.
 
 - [x] Lexer
-    - [x] basic function syntax.
-    - [ ] arithmetic operations.
-    - [ ] 
+    - [x] Idents.
+    - [x] Comments.
+        - [x] Single Line.
+        - [x] Multi Line.
+    - [x] Bindings.
+        - [x] Value.
+        - [x] Type.
+    - [ ] Delimiter balancing.
+    - [ ] Modes.
 
-- [x] basic syntax parser.
-    - [x] Parse Simple unary exprs.
-    - [x] Parse Simple statements.
+- [ ] Parser.
 
-- [ ] interpreter.
+- [ ] Repl.
 
-- [ ] compile to naga intermediate repr.
-
-- [ ] standard library.
+- [ ] Code gen.
+    - [ ] WebAssembly
+    - [ ] x86
+    - [ ] arm
+    - [ ] Spirv 
 
 ## Syntax
 
@@ -78,7 +66,7 @@ To make a function that takes no argument simply omit the variable name.
 Here is a function that always return 2:
 
 ```
-():2 -- This is also equivalent to (): 2 and 2.
+(): 2 -- This is also equivalent to (): 2 and 2.
 ```
 
 To make functions with multiple arguments we use a concept called currying, making a function returning another function.
@@ -160,11 +148,11 @@ It signify `a` is of type int.
 
 To define the type of a function you simply use the types:
 ```
-add_one @ Int -> Int = a: a + 1
+add_one @ Int: Int = a: a + 1
 ```
 You can split the type from the declaration:
 ```
-add_one @ Int -> Int 
+add_one @ Int: Int 
 add_one = a : a + 1
 ```
 To make the type infered simply omit the type declaration:
@@ -194,16 +182,16 @@ There are two types of data structures:
     - Enum
 ```
 -- This is a record 
-{ a@ Int
-, b@ Int 
+{ a @ Int
+, b @ Int 
 }
 
 -- This is an enum with all possible variants.
 | INT Int 
 , REAL Real 
-, Unit 
-, Record { a @ Int, b @ Int } 
-, List [ Int ]
+, UNIT
+, RECORD { a @ Int, b @ Int } 
+, LIST [ Int ]
 |
 
 -- An enum can have constant variants holding values
@@ -238,9 +226,9 @@ sq_len = { x, y, z, w ? 0 }:  x*x + y*y + z*z + w*w
 
 Same thing for Enums:
 ```
-add_one = INT a ->
+add_one = INT a: 
     INT (a+1)
-add_one = REAL a ->
+add_one = REAL a:
     FLOAT (a+1)
 ```
 The compiler will check that all cases are covered.
@@ -275,7 +263,7 @@ else
 
 Match syntax
 ```
-a @ | A 'a', B Int |
+a $ | A 'a', B Int |
 print_a @ a -> Effect _ = a: match a with
     A a -> print "A {}" a;
     B b -> print "b {}" b;
@@ -283,7 +271,9 @@ print_a @ a -> Effect _ = a: match a with
 
 Let/in syntax
 ```
-let a = 2 in print a -- Prints 2
+let 
+    a = 2 
+in print a -- Prints 2
 ```
 
 #### Type Land.
@@ -325,9 +315,6 @@ Positives $
 ##### Type Predicates.
 TODO
 
-##### Type Functions.
-TODO
-
 #### Rank polymorphism.
 TODO
 
@@ -342,6 +329,7 @@ The most usefull and simingly simple combinator is `id`. Its defined as:
 You might wonder where it would be usefull? But wait for a bit i will show you.
 ##### Compose.
 `.`
+
 ##### Blackbird. 
 (Compose but with inner function with 2 argument.)
 `..`

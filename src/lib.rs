@@ -1,10 +1,14 @@
-pub mod parser;
+#[allow(unused)]
+//pub mod parser;
 pub mod lexer;
+mod input;
 //pub mod types;
 
 mod utils {
     use std::fmt;
     use std::ops::Range;
+
+    use crate::input::{MetaData, InputMetaData};
 
     pub type IStr = std::rc::Rc<str>;
     pub type IVec<T> = std::rc::Rc<[T]>;
@@ -65,6 +69,28 @@ mod utils {
     impl fmt::Display for Loc {
         fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
             write!(f, "({}, {})", self.row, self.col)
+        }
+    }
+
+    impl MetaData for Loc {
+        type InputMetaData = Self;
+
+        fn get(metadata: &Self::InputMetaData) -> &Self {
+            &metadata
+        }
+    }
+
+    impl InputMetaData for Loc {
+        type Item = char;
+
+        fn update(&mut self, c: &Self::Item) {
+            if let '\n' = c {
+                self.col += 1;
+                self.row = 0;
+            } else {
+                self.row += 1;
+            }
+            self.pos += 1;
         }
     }
 }
